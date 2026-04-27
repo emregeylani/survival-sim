@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>survival-sim</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+    <!-- Extinction Alert Overlay -->
+    <div id="extinction-alert"></div>
+
+    <!-- Top Stats Bar -->
+    <div id="stats-bar">
+        <div class="stat-group">
+            <span class="stat-label">TICK</span>
+            <span id="stat-tick" class="stat-value">0</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-group">
+            <span class="stat-label plant-color">FLORA</span>
+            <span id="stat-plants" class="stat-value plant-color">0</span>
+        </div>
+        <div class="stat-group">
+            <span class="stat-label herb-color">HERB</span>
+            <span id="stat-herbivores" class="stat-value herb-color">0</span>
+        </div>
+        <div class="stat-group">
+            <span class="stat-label carn-color">CARN</span>
+            <span id="stat-carnivores" class="stat-value carn-color">0</span>
+        </div>
+        <div class="stat-group">
+            <span class="stat-label insect-color">INSECT</span>
+            <span id="stat-insects" class="stat-value insect-color">0</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-group">
+            <span class="stat-label">MAX GEN</span>
+            <span id="stat-maxgen" class="stat-value accent">0</span>
+        </div>
+        <div class="stat-group">
+            <span class="stat-label">EXTINCT</span>
+            <span id="stat-extinct" class="stat-value warn">0</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div id="event-indicator"></div>
+        <div class="stat-divider"></div>
+        <div class="stat-group">
+            <span id="stat-season" class="stat-value" style="color:#68d468;font-size:11px">🌱 SPRING</span>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="main-content">
+
+        <!-- Canvas -->
+        <div id="canvas-container">
+            <canvas id="sim-canvas"></canvas>
+            <div id="canvas-overlay-msg"></div>
+        </div>
+
+        <!-- Right Panel -->
+        <div id="right-panel">
+            <div id="panel-tabs">
+                <button class="tab-btn active" data-tab="entity">ENTITY</button>
+                <button class="tab-btn" data-tab="analytics">CHART</button>
+                <button class="tab-btn" data-tab="params">PARAMS</button>
+            </div>
+
+            <div id="tab-entity" class="tab-content active">
+                <div id="entity-panel">
+                    <div class="no-selection">
+                        <div class="no-sel-icon">◎</div>
+                        <div>click an entity<br>to inspect</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-analytics" class="tab-content">
+                <div id="chart-wrapper">
+                    <canvas id="population-chart"></canvas>
+                </div>
+                <div class="panel-section-title" style="margin:8px 0 4px">EVOLUTION</div>
+                <div id="evolution-wrapper">
+                    <canvas id="evolution-chart"></canvas>
+                </div>
+                <div id="hall-of-fame">
+                    <div class="panel-section-title">HALL OF FAME</div>
+                    <div id="hof-content"></div>
+                </div>
+                <div id="extinction-log">
+                    <div class="panel-section-title">EXTINCTION LOG</div>
+                    <div id="ext-content"><span class="dim">no extinctions yet</span></div>
+                </div>
+            </div>
+
+            <div id="tab-params" class="tab-content">
+                <div id="params-panel">
+                    <div class="panel-section-title">SIMULATION</div>
+                    <div class="param-row">
+                        <label>Mutation Rate</label>
+                        <input type="range" id="p-mutation" min="0" max="0.5" step="0.01" value="0.15">
+                        <span class="param-val" id="p-mutation-val">0.15</span>
+                    </div>
+                    <div class="param-row">
+                        <label>Plant Spread</label>
+                        <input type="range" id="p-spread" min="0.01" max="1" step="0.01" value="0.3">
+                        <span class="param-val" id="p-spread-val">0.30</span>
+                    </div>
+                    <div class="param-row">
+                        <label>Max Herbivores</label>
+                        <input type="range" id="p-maxherb" min="50" max="600" step="10" value="300">
+                        <span class="param-val" id="p-maxherb-val">300</span>
+                    </div>
+                    <div class="param-row">
+                        <label>Max Carnivores</label>
+                        <input type="range" id="p-maxcarn" min="10" max="200" step="5" value="100">
+                        <span class="param-val" id="p-maxcarn-val">100</span>
+                    </div>
+                    <div class="param-row">
+                        <label>Max Plants</label>
+                        <input type="range" id="p-maxplant" min="100" max="1000" step="20" value="500">
+                        <span class="param-val" id="p-maxplant-val">500</span>
+                    </div>
+
+                    <div class="panel-section-title" style="margin-top:16px">WORLD</div>
+                    <div class="param-row">
+                        <label>World Seed</label>
+                        <input type="number" id="p-seed" value="42" style="width:70px">
+                    </div>
+                    <button id="btn-restart" class="action-btn">↺ RESTART</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Controls -->
+    <div id="controls-bar">
+        <div id="time-controls">
+            <button id="btn-play-pause" class="ctrl-btn active">⏸ PAUSE</button>
+            <div class="speed-group">
+                <button class="speed-btn active" data-speed="1">1×</button>
+                <button class="speed-btn" data-speed="3">3×</button>
+                <button class="speed-btn" data-speed="7">7×</button>
+                <button class="speed-btn" data-speed="15">15×</button>
+            </div>
+        </div>
+
+        <div class="ctrl-divider"></div>
+
+        <div id="event-controls">
+            <span class="ctrl-label">TRIGGER EVENT</span>
+            <button class="event-btn" data-event="meteor">☄ METEOR</button>
+            <button class="event-btn" data-event="volcano">🌋 VOLCANO</button>
+            <button class="event-btn" data-event="iceage">❄ ICE AGE</button>
+            <button class="event-btn" data-event="drought">☀ DROUGHT</button>
+        </div>
+    </div>
+
+</div>
+
+<!-- Load order matters: base classes first -->
+<script src="engine/genetics.js"></script>
+<script src="engine/world.js"></script>
+<script src="entities/Living.js"></script>
+<script src="entities/Plant.js"></script>
+<script src="entities/Insect.js"></script>
+<script src="entities/Animal.js"></script>
+<script src="events/disasters.js"></script>
+<script src="ui/panel.js"></script>
+<script src="ui/controls.js"></script>
+<script src="ui/analytics.js"></script>
+<script src="engine/loop.js"></script>
+
+<script>
+function startSim() {
+    const canvas    = document.getElementById('sim-canvas');
+    const container = document.getElementById('canvas-container');
+
+    // Force layout flush, then measure
+    const W = container.offsetWidth  || (window.innerWidth  - 290);
+    const H = container.offsetHeight || (window.innerHeight - 40 - 48);
+
+    canvas.width  = W;
+    canvas.height = H;
+
+    console.log(`[survival-sim] canvas: ${W} x ${H}`);
+
+    window.SIM_PARAMS = {
+        mutationRate:  0.15,
+        plantSpread:   0.30,
+        maxHerbivores: 300,
+        maxCarnivores: 100,
+        maxPlants:     500,
+        seed:          42
+    };
+
+    try {
+        window.world = new World(canvas, SIM_PARAMS.seed);
+        console.log(`[survival-sim] world generated: ${world.cols}×${world.rows} tiles`);
+
+        window.sim = new SimulationLoop(world);
+        console.log(`[survival-sim] entities spawned: ${sim.entities.length}`);
+
+        UI.init(canvas, sim);
+        Controls.init(sim);
+        Analytics.init();
+        Params.init(sim, world);
+
+        sim.start();
+        console.log('[survival-sim] loop started ✓');
+    } catch(err) {
+        console.error('[survival-sim] INIT ERROR:', err);
+        document.getElementById('canvas-overlay-msg').textContent = 'INIT ERROR — open F12 console';
+        document.getElementById('canvas-overlay-msg').classList.add('show');
+    }
+}
+
+// Wait for full layout paint before measuring canvas container
+window.addEventListener('load', () => setTimeout(startSim, 50));
+</script>
+</body>
+</html>
