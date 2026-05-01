@@ -260,40 +260,77 @@ class Animal extends Living {
 
     // ─── Render ─────────────────────────────────────────────────────────
     render(ctx, isSelected) {
-        const r     = this._renderR;
+        const g     = this.genes;
         const ratio = this.energy / this.maxEnergy;
+        const s     = 4.5 + (g.size || 1) * 2.8;   // base radius, size-scaled
+        const isH   = this.type === 'herbivore';
 
         // Lineage-tinted hue within species colour band
-        let hue, sat;
-        if (this.type === 'herbivore') {
-            hue = 190 + ((this.lineageId || 0) % 50); // 190-240 (blue band)
-            sat = 50 + (this.genes.speed || 1) * 14;
-        } else {
-            hue = (350 + ((this.lineageId || 0) % 35)) % 360; // 350-25 (red-orange band)
-            sat = 55 + (this.genes.strength || 1) * 12;
-        }
-        const lit = 28 + ratio * 36;
+        const hue = isH
+            ? 195 + ((this.lineageId || 0) % 45)   // 195-240 blue band
+            : (350 + ((this.lineageId || 0) % 30)) % 360; // 350-20 red band
+        const sat = 55 + (isH ? (g.speed || 0.3) : (g.strength || 1)) * 18;
+        const lit  = 32 + ratio * 30;
+
+        const fill   = `hsl(${hue},${sat}%,${lit}%)`;
+        const stroke = `hsl(${hue},${sat}%,${Math.min(85, lit + 28)}%)`;
 
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(this.direction);
 
-        ctx.fillStyle = `hsl(${hue}, ${sat}%, ${lit}%)`;
-        ctx.beginPath();
-        ctx.moveTo( r * 1.55,  0);
-        ctx.lineTo(-r * 0.75, -r * 0.95);
-        ctx.lineTo(-r * 0.25,  0);
-        ctx.lineTo(-r * 0.75,  r * 0.95);
-        ctx.closePath();
-        ctx.fill();
-
-        if (this.state !== ANIMAL_STATES.IDLE) {
-            ctx.fillStyle = this.state === ANIMAL_STATES.FLEE ? 'rgba(255,80,60,0.75)'
-                          : this.state === ANIMAL_STATES.FOOD ? 'rgba(255,210,40,0.75)'
-                          : 'rgba(0,212,170,0.75)';
+        if (isH) {
+            // Herbivore: rounded teardrop — blunt back, tapered nose
+            ctx.fillStyle   = fill;
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth   = 1.0;
             ctx.beginPath();
-            ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2);
+            ctx.moveTo( s * 1.35,  0);               // nose
+            ctx.bezierCurveTo( s * 1.0, -s * 0.85,  -s * 0.6, -s * 1.0,  -s * 0.9,  0);
+            ctx.bezierCurveTo(-s * 0.6,  s * 1.0,    s * 1.0,  s * 0.85,  s * 1.35,  0);
+            ctx.closePath();
             ctx.fill();
+            ctx.stroke();
+
+            // Small ear nubs
+            ctx.fillStyle = stroke;
+            ctx.beginPath(); ctx.ellipse(-s * 0.55, -s * 0.82, s * 0.22, s * 0.38, -0.4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(-s * 0.55,  s * 0.82, s * 0.22, s * 0.38,  0.4, 0, Math.PI * 2); ctx.fill();
+
+        } else {
+            // Carnivore: angular predator — broad shoulders, narrow snout
+            ctx.fillStyle   = fill;
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth   = 1.1;
+            ctx.beginPath();
+            ctx.moveTo( s * 1.55,  0);               // snout tip
+            ctx.lineTo( s * 0.35, -s * 0.75);        // top-front shoulder
+            ctx.lineTo(-s * 1.05, -s * 0.90);        // top-rear
+            ctx.lineTo(-s * 1.25,  0);               // tail
+            ctx.lineTo(-s * 1.05,  s * 0.90);        // bottom-rear
+            ctx.lineTo( s * 0.35,  s * 0.75);        // bottom-front shoulder
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Fang marks
+            ctx.fillStyle = `hsla(${hue},70%,85%,0.7)`;
+            ctx.beginPath(); ctx.ellipse(s * 1.2, -s * 0.18, s * 0.12, s * 0.22, 0.2, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(s * 1.2,  s * 0.18, s * 0.12, s * 0.22, -0.2, 0, Math.PI * 2); ctx.fill();
+        }
+
+        // Eye
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.beginPath(); ctx.arc(s * 0.52, -s * 0.36, s * 0.20, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = isH ? 'rgba(0,80,200,0.9)' : 'rgba(200,20,0,0.9)';
+        ctx.beginPath(); ctx.arc(s * 0.56, -s * 0.36, s * 0.12, 0, Math.PI * 2); ctx.fill();
+
+        // State indicator dot (small, on body centre)
+        if (this.state !== ANIMAL_STATES.IDLE) {
+            ctx.fillStyle = this.state === ANIMAL_STATES.FLEE ? 'rgba(255,80,60,0.85)'
+                          : this.state === ANIMAL_STATES.FOOD ? 'rgba(255,210,40,0.85)'
+                          : 'rgba(0,212,170,0.85)';
+            ctx.beginPath(); ctx.arc(-s * 0.15, 0, s * 0.28, 0, Math.PI * 2); ctx.fill();
         }
 
         ctx.restore();
@@ -302,9 +339,9 @@ class Animal extends Living {
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth   = 1.5;
             ctx.beginPath();
-            ctx.arc(this.x, this.y, r + 3, 0, Math.PI * 2);
+            ctx.arc(this.x, this.y, s + 4, 0, Math.PI * 2);
             ctx.stroke();
-            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            ctx.strokeStyle = 'rgba(255,255,255,0.12)';
             ctx.lineWidth   = 0.5;
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.genes.visionRange, 0, Math.PI * 2);

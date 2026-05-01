@@ -198,40 +198,77 @@ class Bird extends Living {
     }
 
     render(ctx, isSelected) {
-        const r     = this._renderR;
+        const g     = this.genes;
         const ratio = this.energy / this.maxEnergy;
-        // Teal-green hue band, lineage-tinted
-        const hue   = 155 + ((this.lineageId || 0) % 50) - 25;
-        const lit   = 28 + ratio * 32;
+        const s     = 3.5 + (g.size || 0.55) * 2.0;
+        const hue   = 158 + ((this.lineageId || 0) % 45);
+        const lit   = 30 + ratio * 28;
+
+        const fill   = `hsl(${hue}, 52%, ${lit}%)`;
+        const stroke = `hsl(${hue}, 60%, ${Math.min(82, lit + 30)}%)`;
+        const canHuntHerbivore = (g.strength || 0.4) > 1.5;
 
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(this.direction);
 
-        // Slim bird silhouette: elongated body, small wing arcs
-        ctx.fillStyle = `hsl(${hue}, 55%, ${lit}%)`;
+        // ── Wings (swept back) ─────────────────────────────────────────
+        const wingAlpha = 0.55 + ratio * 0.30;
+        ctx.fillStyle   = `hsla(${hue}, 45%, ${lit + 12}%, ${wingAlpha})`;
+        ctx.strokeStyle = `hsla(${hue}, 55%, ${lit + 25}%, ${wingAlpha + 0.1})`;
+        ctx.lineWidth   = 0.7;
+
+        // Top wing — swept back and up
         ctx.beginPath();
-        ctx.moveTo( r * 1.85, 0);       // beak tip
-        ctx.lineTo( r * 0.25, -r * 0.55);
-        ctx.lineTo(-r * 1.05,  0);       // tail
-        ctx.lineTo( r * 0.25,  r * 0.55);
+        ctx.moveTo( s * 0.40,  0);
+        ctx.lineTo( s * 1.80, -s * 1.10);
+        ctx.lineTo(-s * 0.20, -s * 0.50);
         ctx.closePath();
-        ctx.fill();
+        ctx.fill(); ctx.stroke();
 
-        // Wing hint dots
-        ctx.fillStyle = `hsla(${hue}, 55%, ${lit + 18}%, 0.6)`;
+        // Bottom wing — mirror
         ctx.beginPath();
-        ctx.arc(r * 0.15, -r * 0.88, r * 0.32, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(r * 0.15,  r * 0.88, r * 0.32, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.moveTo( s * 0.40,  0);
+        ctx.lineTo( s * 1.80,  s * 1.10);
+        ctx.lineTo(-s * 0.20,  s * 0.50);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
 
-        if (this.state !== 'idle') {
-            ctx.fillStyle = this.state === 'food' ? 'rgba(255,210,40,0.75)' : 'rgba(0,212,170,0.75)';
+        // ── Body ───────────────────────────────────────────────────────
+        ctx.fillStyle   = fill;
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth   = 1.0;
+        ctx.beginPath();
+        ctx.moveTo( s * 1.70,  0);           // beak tip
+        ctx.lineTo( s * 0.55, -s * 0.42);   // head top
+        ctx.lineTo(-s * 0.30, -s * 0.38);   // back top
+        ctx.lineTo(-s * 1.15,  0);           // tail tip
+        ctx.lineTo(-s * 0.30,  s * 0.38);   // back bottom
+        ctx.lineTo( s * 0.55,  s * 0.42);   // head bottom
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+
+        // ── Predator accent (sharp beak highlight if Dive Hunter) ──────
+        if (canHuntHerbivore) {
+            ctx.fillStyle = `hsla(30, 80%, 65%, 0.65)`;
             ctx.beginPath();
-            ctx.arc(0, 0, r * 0.35, 0, Math.PI * 2);
+            ctx.moveTo(s * 1.70,  0);
+            ctx.lineTo(s * 1.20, -s * 0.20);
+            ctx.lineTo(s * 1.20,  s * 0.20);
+            ctx.closePath();
             ctx.fill();
+        }
+
+        // ── Eye ────────────────────────────────────────────────────────
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.beginPath(); ctx.arc(s * 0.68, -s * 0.18, s * 0.17, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(0,180,120,0.95)';
+        ctx.beginPath(); ctx.arc(s * 0.70, -s * 0.18, s * 0.09, 0, Math.PI * 2); ctx.fill();
+
+        // ── State dot ─────────────────────────────────────────────────
+        if (this.state !== 'idle') {
+            ctx.fillStyle = this.state === 'food' ? 'rgba(255,210,40,0.85)' : 'rgba(0,212,170,0.85)';
+            ctx.beginPath(); ctx.arc(-s * 0.1, 0, s * 0.24, 0, Math.PI * 2); ctx.fill();
         }
 
         ctx.restore();
@@ -239,14 +276,10 @@ class Bird extends Living {
         if (isSelected) {
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth   = 1.5;
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, r + 3, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            ctx.beginPath(); ctx.arc(this.x, this.y, s + 5, 0, Math.PI * 2); ctx.stroke();
+            ctx.strokeStyle = 'rgba(255,255,255,0.12)';
             ctx.lineWidth   = 0.5;
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.genes.visionRange, 0, Math.PI * 2);
-            ctx.stroke();
+            ctx.beginPath(); ctx.arc(this.x, this.y, g.visionRange, 0, Math.PI * 2); ctx.stroke();
         }
     }
 

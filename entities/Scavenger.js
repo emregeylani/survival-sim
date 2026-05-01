@@ -79,8 +79,12 @@ class Scavenger extends Living {
             this.target = null;
 
         } else if (this.energy < this.maxEnergy * 0.85) {
-            // Seek carcasses
-            const carcasses = nearby.filter(e => e instanceof Carcass && e.energy > 3);
+            // Only eat FRESH carcasses (age < freshWindow)
+            const carcasses = nearby.filter(e =>
+                e instanceof Carcass &&
+                e.energy > 3 &&
+                e.age < e.freshWindow
+            );
             if (carcasses.length > 0) {
                 this.state  = 'food';
                 this.target = this._closest(carcasses);
@@ -183,34 +187,54 @@ class Scavenger extends Living {
     }
 
     render(ctx, isSelected) {
-        const r     = this._renderR;
+        const g     = this.genes;
         const ratio = this.energy / this.maxEnergy;
-        const hue   = 270 + ((this.lineageId || 0) % 40) - 20; // purple band, lineage-tinted
-        const lit   = 22 + ratio * 32;
+        const s     = 4.0 + (g.size || 0.75) * 2.2;
+        const hue   = 275 + ((this.lineageId || 0) % 35);
+        const lit   = 28 + ratio * 28;
+
+        const fill   = `hsl(${hue}, 38%, ${lit}%)`;
+        const stroke = `hsl(${hue}, 45%, ${Math.min(80, lit + 30)}%)`;
 
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(this.direction);
 
-        // Pentagon shape — distinct from chevron animals
-        ctx.fillStyle = `hsl(${hue}, 42%, ${lit}%)`;
+        // Hunched scavenger body — wide at rear, narrow hooked beak
+        ctx.fillStyle   = fill;
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth   = 1.0;
         ctx.beginPath();
-        ctx.moveTo( r * 1.45, 0);
-        ctx.lineTo( r * 0.45, -r * 0.95);
-        ctx.lineTo(-r * 0.90, -r * 0.65);
-        ctx.lineTo(-r * 0.90,  r * 0.65);
-        ctx.lineTo( r * 0.45,  r * 0.95);
+        ctx.moveTo( s * 1.30,  s * 0.18);   // beak tip (slightly drooped)
+        ctx.lineTo( s * 0.55, -s * 0.55);   // forehead
+        ctx.lineTo(-s * 0.20, -s * 1.05);   // hump top
+        ctx.lineTo(-s * 1.10, -s * 0.80);   // back-top
+        ctx.lineTo(-s * 1.35,  0);           // tail
+        ctx.lineTo(-s * 1.10,  s * 0.80);   // back-bottom
+        ctx.lineTo(-s * 0.20,  s * 1.05);   // hump bottom
+        ctx.lineTo( s * 0.55,  s * 0.55);   // throat
         ctx.closePath();
         ctx.fill();
+        ctx.stroke();
 
-        // State inner dot
+        // Bald head patch (reddish — carrion eater trait)
+        ctx.fillStyle = `hsl(10, 60%, ${28 + ratio * 20}%)`;
+        ctx.beginPath();
+        ctx.ellipse(s * 0.70, 0, s * 0.32, s * 0.38, 0.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Eye
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.beginPath(); ctx.arc(s * 0.80, -s * 0.12, s * 0.16, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(180,0,220,0.95)';
+        ctx.beginPath(); ctx.arc(s * 0.82, -s * 0.12, s * 0.09, 0, Math.PI * 2); ctx.fill();
+
+        // State dot
         if (this.state !== 'idle') {
-            ctx.fillStyle = this.state === 'flee' ? 'rgba(255,80,60,0.75)'
-                          : this.state === 'food' ? 'rgba(200,140,255,0.75)'
-                          : 'rgba(0,212,170,0.75)';
-            ctx.beginPath();
-            ctx.arc(0, 0, r * 0.40, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.fillStyle = this.state === 'flee' ? 'rgba(255,80,60,0.85)'
+                          : this.state === 'food' ? 'rgba(200,140,255,0.85)'
+                          : 'rgba(0,212,170,0.85)';
+            ctx.beginPath(); ctx.arc(-s * 0.2, 0, s * 0.26, 0, Math.PI * 2); ctx.fill();
         }
 
         ctx.restore();
@@ -218,14 +242,10 @@ class Scavenger extends Living {
         if (isSelected) {
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth   = 1.5;
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, r + 3, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            ctx.beginPath(); ctx.arc(this.x, this.y, s + 4, 0, Math.PI * 2); ctx.stroke();
+            ctx.strokeStyle = 'rgba(255,255,255,0.12)';
             ctx.lineWidth   = 0.5;
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.genes.visionRange, 0, Math.PI * 2);
-            ctx.stroke();
+            ctx.beginPath(); ctx.arc(this.x, this.y, g.visionRange, 0, Math.PI * 2); ctx.stroke();
         }
     }
 
