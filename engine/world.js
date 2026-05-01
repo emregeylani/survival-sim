@@ -2,15 +2,20 @@
 // Generates and renders the biome map. Handles terrain queries and modifications.
 
 const BIOMES = {
-    water:     { resources: 0.00, energyCost: 0.0, color: [15,  35,  60],  passable: false },
-    snow:      { resources: 0.25, energyCost: 1.4, color: [190, 215, 230], passable: true  },
-    desert:    { resources: 0.20, energyCost: 1.3, color: [120, 95,  35],  passable: true  },
-    grassland: { resources: 0.70, energyCost: 1.0, color: [40,  80,  25],  passable: true  },
-    forest:    { resources: 1.00, energyCost: 0.9, color: [20,  55,  18],  passable: true  },
-    volcanic:  { resources: 0.05, energyCost: 2.0, color: [60,  20,  10],  passable: true  },
-    scorched:  { resources: 0.05, energyCost: 1.8, color: [50,  35,  10],  passable: true  },
-    frozen:    { resources: 0.10, energyCost: 1.8, color: [160, 200, 220], passable: true  },
-    drought:   { resources: 0.08, energyCost: 1.5, color: [130, 100, 40],  passable: true  },
+    water:     { resources: 0.00, energyCost: 0.0,  color: [15,  35,  60],  passable: false },
+    snow:      { resources: 0.25, energyCost: 1.4,  color: [190, 215, 230], passable: true  },
+    desert:    { resources: 0.20, energyCost: 1.3,  color: [120, 95,  35],  passable: true  },
+    grassland: { resources: 0.70, energyCost: 1.0,  color: [40,  80,  25],  passable: true  },
+    forest:    { resources: 1.00, energyCost: 0.9,  color: [20,  55,  18],  passable: true  },
+    volcanic:  { resources: 0.05, energyCost: 2.0,  color: [60,  20,  10],  passable: true  },
+    scorched:  { resources: 0.05, energyCost: 1.8,  color: [50,  35,  10],  passable: true  },
+    frozen:    { resources: 0.10, energyCost: 1.8,  color: [160, 200, 220], passable: true  },
+    drought:   { resources: 0.08, energyCost: 1.5,  color: [130, 100, 40],  passable: true  },
+    // ── New biomes ────────────────────────────────────────────────────────
+    wetland:   { resources: 0.80, energyCost: 0.85, color: [22,  75,  60],  passable: true  },
+    // aquaticAdaptation bonus; rich resource zone along water margins
+    savanna:   { resources: 0.55, energyCost: 1.10, color: [140, 115, 40],  passable: true  },
+    // Open plain — selects for speed; slight heat penalty
 };
 
 class World {
@@ -24,10 +29,8 @@ class World {
         this.cols     = Math.ceil(this.width  / this.tileSize);
         this.rows     = Math.ceil(this.height / this.tileSize);
 
-        // Flat array of biome type strings
         this.tiles    = new Array(this.cols * this.rows);
 
-        // Cached background image
         this._bgCanvas = document.createElement('canvas');
         this._bgCanvas.width  = this.width;
         this._bgCanvas.height = this.height;
@@ -80,9 +83,9 @@ class World {
     }
 
     _determineBiome(nx, ny) {
-        const elev   = this._octaveNoise(nx * 3.5, ny * 3.5, 5);
-        const moist  = this._octaveNoise(nx * 2.0 + 10, ny * 2.0 + 10, 4);
-        const temp   = this._octaveNoise(nx * 1.5 + 20, ny * 1.5 + 20, 3);
+        const elev  = this._octaveNoise(nx * 3.5, ny * 3.5, 5);
+        const moist = this._octaveNoise(nx * 2.0 + 10, ny * 2.0 + 10, 4);
+        const temp  = this._octaveNoise(nx * 1.5 + 20, ny * 1.5 + 20, 3);
 
         // Water — low elevation areas
         if (elev < 0.30) return 'water';
@@ -94,8 +97,14 @@ class World {
         const vHeat = this._noise(nx * 5 + 50, ny * 5 + 50);
         if (ny > 0.72 && nx > 0.55 && vHeat > 0.72) return 'volcanic';
 
+        // Wetland — water margins, very moist, low-medium elevation
+        if (elev > 0.29 && elev < 0.42 && moist > 0.65) return 'wetland';
+
         // Desert — hot & dry
         if (moist < 0.30 && temp > 0.60) return 'desert';
+
+        // Savanna — warm, moderate moisture, open (no thick forest)
+        if (moist > 0.22 && moist < 0.42 && temp > 0.52 && elev > 0.38) return 'savanna';
 
         // Forest — moist elevated
         if (moist > 0.58 && elev > 0.50) return 'forest';
@@ -117,10 +126,6 @@ class World {
         return b && b.passable;
     }
 
-    /**
-     * Apply a disaster to a circular area, replacing tiles with newType.
-     * radius is in world pixels.
-     */
     applyDisasterArea(cx, cy, radius, newType) {
         const tx0 = Math.max(0, Math.floor((cx - radius) / this.tileSize));
         const tx1 = Math.min(this.cols - 1, Math.ceil((cx + radius) / this.tileSize));
@@ -139,12 +144,8 @@ class World {
         this._bgDirty = true;
     }
 
-    /**
-     * Gradually shift all passable tiles toward newType (for ice age / drought).
-     * fraction ∈ [0,1] — portion of tiles to convert this call.
-     */
     spreadDisaster(newType, fraction = 0.005, onlyBiomes = null) {
-        const total = this.cols * this.rows;
+        const total    = this.cols * this.rows;
         const toChange = Math.floor(total * fraction);
         for (let i = 0; i < toChange; i++) {
             const idx = Math.floor(Math.random() * total);
@@ -167,7 +168,6 @@ class World {
             for (let tx = 0; tx < this.cols; tx++) {
                 const biome = BIOMES[this.tiles[ty * this.cols + tx]];
                 const [r, g, b] = biome.color;
-                // Slight per-tile brightness variation for texture
                 const v = (this._rand(tx, ty) - 0.5) * 12;
                 ctx.fillStyle = `rgb(${r+v|0},${g+v|0},${b+v|0})`;
                 ctx.fillRect(tx * ts, ty * ts, ts, ts);
@@ -176,11 +176,9 @@ class World {
         this._bgDirty = false;
     }
 
-    /** Draw background to main canvas. Call once per frame before entities. */
     render() {
         if (this._bgDirty) this._rebuildBackground();
         this.ctx.drawImage(this._bgCanvas, 0, 0);
-        // Subtle seasonal colour tint over the terrain
         if (window.SEASON && window.SEASON.tint) {
             this.ctx.fillStyle = window.SEASON.tint;
             this.ctx.fillRect(0, 0, this.width, this.height);

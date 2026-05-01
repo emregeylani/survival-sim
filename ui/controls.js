@@ -12,7 +12,6 @@ const Controls = {
         this._bindEvents();
     },
 
-    // ── Tabs ─────────────────────────────────────────────────────────────
     _bindTabs() {
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -24,7 +23,6 @@ const Controls = {
         });
     },
 
-    // ── Time Controls ────────────────────────────────────────────────────
     _bindTime() {
         const playPause = document.getElementById('btn-play-pause');
         playPause.addEventListener('click', () => {
@@ -32,7 +30,6 @@ const Controls = {
             playPause.textContent = this.sim.paused ? '▶ PLAY' : '⏸ PAUSE';
             playPause.classList.toggle('paused', this.sim.paused);
         });
-
         document.querySelectorAll('.speed-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
@@ -42,7 +39,6 @@ const Controls = {
         });
     },
 
-    // ── Disaster Event Buttons ────────────────────────────────────────────
     _bindEvents() {
         document.querySelectorAll('.event-btn').forEach(btn => {
             btn.addEventListener('click', () => this._onEventBtn(btn));
@@ -51,36 +47,21 @@ const Controls = {
 
     _onEventBtn(btn) {
         const type = btn.dataset.event;
-
-        // Ice age & drought are global — fire immediately
         if (type === 'iceage') {
             Disasters.triggerIceAge(window.world, this.sim.entities);
-            this._flashBtn(btn);
-            Analytics.logDisaster('Ice Age');
-            return;
+            this._flashBtn(btn); Analytics.logDisaster('Ice Age'); return;
         }
         if (type === 'drought') {
             Disasters.triggerDrought(window.world, this.sim.entities);
-            this._flashBtn(btn);
-            Analytics.logDisaster('Drought');
-            return;
+            this._flashBtn(btn); Analytics.logDisaster('Drought'); return;
         }
-
-        // Meteor & volcano need click location on canvas
-        if (this._pendingEvent === type) {
-            // Cancel if same button pressed again
-            this._clearPending();
-            return;
-        }
+        if (this._pendingEvent === type) { this._clearPending(); return; }
         this._clearPending();
         this._pendingEvent = type;
         this._pendingBtn   = btn;
         btn.classList.add('pending');
-
         const msg = document.getElementById('canvas-overlay-msg');
-        msg.textContent = type === 'meteor'
-            ? '☄  CLICK TO AIM METEOR STRIKE'
-            : '🌋  CLICK TO PLACE VOLCANO';
+        msg.textContent = type === 'meteor' ? '☄  CLICK TO AIM METEOR STRIKE' : '🌋  CLICK TO PLACE VOLCANO';
         msg.classList.add('show');
     },
 
@@ -99,12 +80,8 @@ const Controls = {
 
     _clearPending() {
         this._pendingEvent = null;
-        if (this._pendingBtn) {
-            this._pendingBtn.classList.remove('pending');
-            this._pendingBtn = null;
-        }
-        const msg = document.getElementById('canvas-overlay-msg');
-        msg.classList.remove('show');
+        if (this._pendingBtn) { this._pendingBtn.classList.remove('pending'); this._pendingBtn = null; }
+        document.getElementById('canvas-overlay-msg').classList.remove('show');
     },
 
     _flashBtn(btn) {
@@ -119,6 +96,7 @@ const Params = {
         const bind = (id, key, transform = parseFloat) => {
             const el  = document.getElementById(id);
             const val = document.getElementById(id + '-val');
+            if (!el) return;
             el.addEventListener('input', () => {
                 const v = transform(el.value);
                 SIM_PARAMS[key] = v;
@@ -126,22 +104,20 @@ const Params = {
             });
         };
 
-        bind('p-mutation', 'mutationRate');
-        bind('p-spread',   'plantSpread');
-        bind('p-maxherb',  'maxHerbivores', parseInt);
-        bind('p-maxcarn',  'maxCarnivores', parseInt);
-        bind('p-maxplant', 'maxPlants',     parseInt);
-
-        document.getElementById('p-maxherb-val').textContent = '300';
-        document.getElementById('p-maxcarn-val').textContent = '100';
-        document.getElementById('p-maxplant-val').textContent= '500';
+        bind('p-mutation',   'mutationRate');
+        bind('p-spread',     'plantSpread');
+        bind('p-maxherb',    'maxHerbivores',  parseInt);
+        bind('p-maxcarn',    'maxCarnivores',  parseInt);
+        bind('p-maxplant',   'maxPlants',      parseInt);
+        bind('p-maxscav',    'maxScavengers',  parseInt);
+        bind('p-maxbird',    'maxBirds',       parseInt);
+        bind('p-matingrange','maxMatingRange', parseInt);
 
         document.getElementById('btn-restart').addEventListener('click', () => {
             const seed = parseInt(document.getElementById('p-seed').value) || 42;
             SIM_PARAMS.seed = seed;
-
             const canvas = document.getElementById('sim-canvas');
-            window.world = new World(canvas, seed);
+            window.world  = new World(canvas, seed);
             window.sim.restart(window.world);
             Analytics.reset();
             UI.selectedEntity = null;

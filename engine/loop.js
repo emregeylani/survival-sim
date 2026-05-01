@@ -10,11 +10,14 @@ class SimulationLoop {
         this.extinctionLog  = [];
         this._grid          = new SpatialGrid(world.width, world.height, 80);
         this._raf           = null;
-        this._analyticsEvery= 15;   // update chart every N ticks
-        this._extinctTrack  = { herbivore: false, carnivore: false, insect: false, plant: false };
+        this._analyticsEvery= 15;
+        this._extinctTrack  = {
+            herbivore: false, carnivore: false,
+            insect: false,    plant: false,
+            scavenger: false, bird: false,
+        };
         this._lastCounts    = {};
 
-        // Seasonal cycle
         this._seasonIndex = 0;
         this._seasonTimer = 0;
         window.SEASON = this._makeSeason(0);
@@ -25,27 +28,27 @@ class SimulationLoop {
     // ── Initial Population ───────────────────────────────────────────────
     _populate() {
         this.entities = [];
-
         const W = this.world.width;
         const H = this.world.height;
 
-        const tryPlace = (type, count, factory) => {
+        const tryPlace = (count, factory) => {
             let placed = 0, tries = 0;
             while (placed < count && tries < count * 8) {
                 tries++;
                 const x = 12 + Math.random() * (W - 24);
                 const y = 12 + Math.random() * (H - 24);
                 if (!this.world.isPassable(x, y)) continue;
-                const e = factory(x, y);
-                this.entities.push(e);
+                this.entities.push(factory(x, y));
                 placed++;
             }
         };
 
-        tryPlace('plant',      180, (x, y) => new Plant(x, y));
-        tryPlace('herbivore',   50, (x, y) => new Animal(x, y, 'herbivore'));
-        tryPlace('carnivore',    8, (x, y) => new Animal(x, y, 'carnivore')); // FIX: was 18, predator:prey ratio 1:6 is more realistic
-        tryPlace('insect',      60, (x, y) => new Insect(x, y));
+        tryPlace(180, (x, y) => new Plant(x, y));
+        tryPlace(50,  (x, y) => new Animal(x, y, 'herbivore'));
+        tryPlace(8,   (x, y) => new Animal(x, y, 'carnivore'));
+        tryPlace(60,  (x, y) => new Insect(x, y));
+        tryPlace(14,  (x, y) => new Scavenger(x, y));
+        tryPlace(18,  (x, y) => new Bird(x, y));
     }
 
     // ── Main Loop ────────────────────────────────────────────────────────
@@ -66,12 +69,16 @@ class SimulationLoop {
         this.world         = newWorld;
         this.tick          = 0;
         this.extinctionLog = [];
-        this._extinctTrack = { herbivore: false, carnivore: false, insect: false, plant: false };
-        this._grid         = new SpatialGrid(newWorld.width, newWorld.height, 80);
-        Living._nextId     = 0;
+        this._extinctTrack = {
+            herbivore: false, carnivore: false,
+            insect: false,    plant: false,
+            scavenger: false, bird: false,
+        };
+        this._grid        = new SpatialGrid(newWorld.width, newWorld.height, 80);
+        Living._nextId    = 0;
         this._seasonIndex = 0;
         this._seasonTimer = 0;
-        window.SEASON = this._makeSeason(0);
+        window.SEASON     = this._makeSeason(0);
         this._updateSeasonUI();
         this._populate();
     }
@@ -81,52 +88,42 @@ class SimulationLoop {
         this.tick++;
         const dt = 1;
 
-        // Rebuild spatial grid each tick
         this._grid.clear();
         for (const e of this.entities) {
             if (e.alive) this._grid.add(e);
         }
 
-        // Update all entities
         for (let i = 0; i < this.entities.length; i++) {
             const e = this.entities[i];
             if (e.alive) e.update(dt, this.world, this.entities, this._grid);
         }
 
-        // Advance slow disasters
         Disasters.tick(dt, this.world, this.entities);
 
-        // Seasonal cycle — flip every 500 ticks
         this._seasonTimer += dt;
         if (this._seasonTimer >= 500) {
             this._seasonTimer = 0;
             this._seasonIndex = (this._seasonIndex + 1) % 4;
-            window.SEASON = this._makeSeason(this._seasonIndex);
+            window.SEASON     = this._makeSeason(this._seasonIndex);
             this._updateSeasonUI();
         }
 
-        // Purge dead (keep array compact; do periodically)
         if (this.tick % 30 === 0) {
             this.entities = this.entities.filter(e => e.alive);
         }
 
-        // Analytics & extinction tracking
         if (this.tick % this._analyticsEvery === 0) {
             this._updateAnalytics();
-            this._reseedIfNeeded(); // FIX: prevent total plant collapse from starving everything
+            this._reseedIfNeeded();
         }
     }
 
     // ── Reseeding ─────────────────────────────────────────────────────────
-    // If plants drop critically low, scatter a seed wave. Simulates wind dispersal
-    // / dormant seeds — realistic and prevents total ecosystem collapse.
     _reseedIfNeeded() {
         const plantCount = this.entities.filter(e => e instanceof Plant && e.alive).length;
         if (plantCount < 20) {
-            const toAdd = 15;
-            let placed  = 0;
-            let tries   = 0;
-            while (placed < toAdd && tries < toAdd * 10) {
+            let placed = 0, tries = 0;
+            while (placed < 15 && tries < 150) {
                 tries++;
                 const x = 12 + Math.random() * (this.world.width  - 24);
                 const y = 12 + Math.random() * (this.world.height - 24);
@@ -134,47 +131,75 @@ class SimulationLoop {
                 const biome = this.world.getBiomeAt(x, y);
                 if (!biome || biome.type === 'water' || biome.type === 'volcanic') continue;
                 const p = new Plant(x, y);
-                p.energy = 15; // sprout — fragile but alive
+                p.energy = 15;
                 this.entities.push(p);
                 placed++;
             }
-            if (placed > 0) {
-                Analytics.logDisaster(`🌱 Seed Rain (+${placed} plants)`);
+            if (placed > 0) Analytics.logDisaster(`🌱 Seed Rain (+${placed} plants)`);
+        }
+
+        // Emergency scavenger rescue — tiny minimum floor
+        const scavCount = this.entities.filter(e => e instanceof Scavenger && e.alive).length;
+        if (scavCount < 3) {
+            let placed = 0, tries = 0;
+            while (placed < 4 && tries < 80) {
+                tries++;
+                const x = 12 + Math.random() * (this.world.width  - 24);
+                const y = 12 + Math.random() * (this.world.height - 24);
+                if (!this.world.isPassable(x, y)) continue;
+                this.entities.push(new Scavenger(x, y));
+                placed++;
             }
         }
     }
 
     // ── Analytics ────────────────────────────────────────────────────────
     _updateAnalytics() {
-        const counts = { plants: 0, herbivores: 0, carnivores: 0, insects: 0 };
+        const counts = {
+            plants: 0, herbivores: 0, carnivores: 0,
+            insects: 0, scavengers: 0, birds: 0, carcasses: 0,
+        };
+
+        let speedSum = 0, strengthSum = 0, maxGen = 0, animalCount = 0;
 
         for (const e of this.entities) {
             if (!e.alive) continue;
-            if (e instanceof Plant)  { counts.plants++;     }
-            else if (e instanceof Insect) { counts.insects++;    }
+
+            if (e instanceof Carcass)        counts.carcasses++;
+            else if (e instanceof Plant)     counts.plants++;
+            else if (e instanceof Insect)    counts.insects++;
+            else if (e instanceof Scavenger) counts.scavengers++;
+            else if (e instanceof Bird)      counts.birds++;
             else if (e instanceof Animal) {
                 if (e.type === 'herbivore') counts.herbivores++;
                 else                        counts.carnivores++;
             }
-        }
-        this._lastCounts = counts;
 
+            if (!(e instanceof Plant) && !(e instanceof Carcass) && e.genes?.speed) {
+                speedSum    += e.genes.speed    || 1;
+                strengthSum += e.genes.strength || 1;
+                if (e.generation > maxGen) maxGen = e.generation;
+                animalCount++;
+            }
+        }
+
+        this._lastCounts = counts;
         Analytics.update(this.tick, counts, this.entities);
 
-        // Gene evolution tracking
-        const liveAnimals = this.entities.filter(e => e instanceof Animal && e.alive);
-        if (liveAnimals.length > 0) {
-            const avgSpeed    = liveAnimals.reduce((s, a) => s + (a.genes.speed    || 1), 0) / liveAnimals.length;
-            const avgStrength = liveAnimals.reduce((s, a) => s + (a.genes.strength || 1), 0) / liveAnimals.length;
-            const maxGen      = liveAnimals.reduce((m, a) => Math.max(m, a.generation), 0);
-            Analytics.updateGenes(this.tick, { avgSpeed, avgStrength, maxGen });
+        if (animalCount > 0) {
+            Analytics.updateGenes(this.tick, {
+                avgSpeed:    speedSum    / animalCount,
+                avgStrength: strengthSum / animalCount,
+                maxGen,
+            });
         }
 
-        // Extinction detection
         this._checkExtinction('herbivore', counts.herbivores === 0);
         this._checkExtinction('carnivore', counts.carnivores === 0);
         this._checkExtinction('insect',    counts.insects    === 0);
         this._checkExtinction('plant',     counts.plants     === 0);
+        this._checkExtinction('scavenger', counts.scavengers === 0);
+        this._checkExtinction('bird',      counts.birds      === 0);
     }
 
     _checkExtinction(key, isZero) {
@@ -183,33 +208,19 @@ class SimulationLoop {
             Analytics.logExtinction(key.toUpperCase(), this.tick);
             this._showExtinctionAlert(key);
         } else if (!isZero && this._extinctTrack[key]) {
-            this._extinctTrack[key] = false; // Recovered
+            this._extinctTrack[key] = false;
         }
     }
 
     _showExtinctionAlert(key) {
-        const COLORS = { herbivore: '#4a9eff', carnivore: '#ff4a3a', insect: '#ffd040', plant: '#38c968' };
-        const overlay = document.getElementById('extinction-alert');
-        if (!overlay) return;
-        overlay.textContent  = `⚠ ${key.toUpperCase()} EXTINCT — T${this.tick}`;
-        overlay.style.borderColor = COLORS[key] || '#ff4a3a';
-        overlay.style.color       = COLORS[key] || '#ff4a3a';
-        overlay.classList.add('show');
-        this.paused = true;
-        const playBtn = document.getElementById('btn-play-pause');
-        if (playBtn) { playBtn.textContent = '▶ PLAY'; playBtn.classList.add('paused'); }
-        setTimeout(() => {
-            overlay.classList.remove('show');
-            this.paused = false;
-            if (playBtn) { playBtn.textContent = '⏸ PAUSE'; playBtn.classList.remove('paused'); }
-        }, 2500);
+        // No overlay, no pause — info goes to the extinction log in the analytics panel
     }
 
     // ── Season Helpers ───────────────────────────────────────────────────
     _makeSeason(index) {
         const SEASONS = [
-            { name: 'SPRING', emoji: '🌱', mult: 1.1, tint: 'rgba(80,200,80,0.05)',    textColor: '#68d468' },
-            { name: 'SUMMER', emoji: '☀',  mult: 1.0, tint: 'rgba(255,200,60,0.05)',   textColor: '#ffd040' },
+            { name: 'SPRING', emoji: '🌱', mult: 1.1,  tint: 'rgba(80,200,80,0.05)',   textColor: '#68d468' },
+            { name: 'SUMMER', emoji: '☀',  mult: 1.0,  tint: 'rgba(255,200,60,0.05)',  textColor: '#ffd040' },
             { name: 'AUTUMN', emoji: '🍂', mult: 0.75, tint: 'rgba(200,130,40,0.07)',  textColor: '#d07830' },
             { name: 'WINTER', emoji: '❄',  mult: 0.45, tint: 'rgba(80,140,220,0.10)', textColor: '#80b8e8' },
         ];
@@ -219,26 +230,42 @@ class SimulationLoop {
     _updateSeasonUI() {
         const s  = window.SEASON;
         const el = document.getElementById('stat-season');
-        if (el) {
-            el.textContent = `${s.emoji} ${s.name}`;
-            el.style.color = s.textColor;
-        }
+        if (el) { el.textContent = `${s.emoji} ${s.name}`; el.style.color = s.textColor; }
     }
 
     // ── Render ───────────────────────────────────────────────────────────
     _render() {
-        const ctx    = this.world.ctx;
-        const sel    = UI.selectedEntity;
+        const ctx = this.world.ctx;
+        const sel = UI.selectedEntity;
+        const cam = window.camera || { scale: 1, tx: 0, ty: 0 };
 
+        // Clear full canvas
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = '#060c12';
+        ctx.fillRect(0, 0, this.world.width, this.world.height);
+
+        // Apply camera
+        ctx.save();
+        ctx.setTransform(cam.scale, 0, 0, cam.scale, cam.tx, cam.ty);
+
+        // Layer order: world → carcasses → plants → moving entities
         this.world.render();
 
-        // Draw all entities
+        for (const e of this.entities) {
+            if (e.alive && e instanceof Carcass) e.render(ctx, e === sel);
+        }
+        for (const e of this.entities) {
+            if (e.alive && e instanceof Plant) e.render(ctx, e === sel);
+        }
         for (const e of this.entities) {
             if (!e.alive) continue;
-            e.render(ctx, e === sel);
+            if (!(e instanceof Carcass) && !(e instanceof Plant)) {
+                e.render(ctx, e === sel);
+            }
         }
 
-        // Refresh entity panel live
+        ctx.restore();
+
         if (sel) UI.tick();
     }
 }

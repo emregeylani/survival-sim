@@ -10,7 +10,6 @@
 <body>
 <div id="app">
 
-    <!-- Extinction Alert Overlay -->
     <div id="extinction-alert"></div>
 
     <!-- Top Stats Bar -->
@@ -33,8 +32,16 @@
             <span id="stat-carnivores" class="stat-value carn-color">0</span>
         </div>
         <div class="stat-group">
-            <span class="stat-label insect-color">INSECT</span>
+            <span class="stat-label insect-color">INSCT</span>
             <span id="stat-insects" class="stat-value insect-color">0</span>
+        </div>
+        <div class="stat-group">
+            <span class="stat-label" style="color:#c878ff">SCAV</span>
+            <span id="stat-scavengers" class="stat-value" style="color:#c878ff">0</span>
+        </div>
+        <div class="stat-group">
+            <span class="stat-label" style="color:#40d4aa">BIRD</span>
+            <span id="stat-birds" class="stat-value" style="color:#40d4aa">0</span>
         </div>
         <div class="stat-divider"></div>
         <div class="stat-group">
@@ -56,10 +63,10 @@
     <!-- Main Content -->
     <div id="main-content">
 
-        <!-- Canvas -->
         <div id="canvas-container">
             <canvas id="sim-canvas"></canvas>
             <div id="canvas-overlay-msg"></div>
+            <div id="zoom-indicator">1.0×</div>
         </div>
 
         <!-- Right Panel -->
@@ -91,10 +98,6 @@
                     <div class="panel-section-title">HALL OF FAME</div>
                     <div id="hof-content"></div>
                 </div>
-                <div id="extinction-log">
-                    <div class="panel-section-title">EXTINCTION LOG</div>
-                    <div id="ext-content"><span class="dim">no extinctions yet</span></div>
-                </div>
             </div>
 
             <div id="tab-params" class="tab-content">
@@ -125,6 +128,21 @@
                         <input type="range" id="p-maxplant" min="100" max="1000" step="20" value="500">
                         <span class="param-val" id="p-maxplant-val">500</span>
                     </div>
+                    <div class="param-row">
+                        <label>Max Scavengers</label>
+                        <input type="range" id="p-maxscav" min="10" max="150" step="5" value="80">
+                        <span class="param-val" id="p-maxscav-val">80</span>
+                    </div>
+                    <div class="param-row">
+                        <label>Max Birds</label>
+                        <input type="range" id="p-maxbird" min="10" max="200" step="5" value="100">
+                        <span class="param-val" id="p-maxbird-val">100</span>
+                    </div>
+                    <div class="param-row">
+                        <label>Mating Range</label>
+                        <input type="range" id="p-matingrange" min="30" max="400" step="10" value="180">
+                        <span class="param-val" id="p-matingrange-val">180</span>
+                    </div>
 
                     <div class="panel-section-title" style="margin-top:16px">WORLD</div>
                     <div class="param-row">
@@ -134,7 +152,15 @@
                     <button id="btn-restart" class="action-btn">↺ RESTART</button>
                 </div>
             </div>
-        </div>
+
+            <!-- Persistent extinction log — always visible at bottom of right panel -->
+            <div id="extinction-log-persistent">
+                <div class="ext-log-title">EXTINCTION LOG</div>
+                <div id="ext-content"><span class="dim">no extinctions yet</span></div>
+            </div>
+
+        </div><!-- end right-panel -->
+
     </div>
 
     <!-- Bottom Controls -->
@@ -148,9 +174,7 @@
                 <button class="speed-btn" data-speed="15">15×</button>
             </div>
         </div>
-
         <div class="ctrl-divider"></div>
-
         <div id="event-controls">
             <span class="ctrl-label">TRIGGER EVENT</span>
             <button class="event-btn" data-event="meteor">☄ METEOR</button>
@@ -162,13 +186,16 @@
 
 </div>
 
-<!-- Load order matters: base classes first -->
+<!-- Load order: base classes first, then entities, then UI, then loop -->
 <script src="engine/genetics.js"></script>
 <script src="engine/world.js"></script>
 <script src="entities/Living.js"></script>
 <script src="entities/Plant.js"></script>
 <script src="entities/Insect.js"></script>
+<script src="entities/Carcass.js"></script>
 <script src="entities/Animal.js"></script>
+<script src="entities/Scavenger.js"></script>
+<script src="entities/Bird.js"></script>
 <script src="events/disasters.js"></script>
 <script src="ui/panel.js"></script>
 <script src="ui/controls.js"></script>
@@ -180,10 +207,8 @@ function startSim() {
     const canvas    = document.getElementById('sim-canvas');
     const container = document.getElementById('canvas-container');
 
-    // Force layout flush, then measure
     const W = container.offsetWidth  || (window.innerWidth  - 290);
     const H = container.offsetHeight || (window.innerHeight - 40 - 48);
-
     canvas.width  = W;
     canvas.height = H;
 
@@ -195,8 +220,82 @@ function startSim() {
         maxHerbivores: 300,
         maxCarnivores: 100,
         maxPlants:     500,
-        seed:          42
+        maxScavengers: 80,
+        maxBirds:      100,
+        maxMatingRange: 180,
+        seed: Math.floor(Math.random() * 99999),
     };
+
+    // Show the random seed in the input
+    document.getElementById('p-seed').value = SIM_PARAMS.seed;
+
+    // ── Camera (zoom + pan) ───────────────────────────────────────────────
+    window.camera = { scale: 1, tx: 0, ty: 0, minScale: 0.25, maxScale: 12 };
+
+    const zoomEl  = document.getElementById('zoom-indicator');
+    const updateZoomUI = () => {
+        zoomEl.textContent = camera.scale.toFixed(2) + '×';
+        zoomEl.classList.toggle('zoomed', camera.scale !== 1);
+    };
+
+    // Zoom with scroll wheel — zoom around cursor
+    canvas.addEventListener('wheel', e => {
+        e.preventDefault();
+        const rect   = canvas.getBoundingClientRect();
+        const sx     = e.clientX - rect.left;
+        const sy     = e.clientY - rect.top;
+        const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+        const newScale = Math.max(camera.minScale, Math.min(camera.maxScale, camera.scale * factor));
+        camera.tx    = sx - (sx - camera.tx) * (newScale / camera.scale);
+        camera.ty    = sy - (sy - camera.ty) * (newScale / camera.scale);
+        camera.scale = newScale;
+        updateZoomUI();
+    }, { passive: false });
+
+    // Pan with left-drag (suppress click if dragged more than 6px)
+    let _panActive = false, _panSX = 0, _panSY = 0, _panTX = 0, _panTY = 0, _panMoved = false;
+
+    canvas.addEventListener('mousedown', e => {
+        if (e.button !== 0) return;
+        _panActive = true;
+        _panMoved  = false;
+        _panSX     = e.clientX;
+        _panSY     = e.clientY;
+        _panTX     = camera.tx;
+        _panTY     = camera.ty;
+        canvas.style.cursor = 'grab';
+    });
+
+    window.addEventListener('mousemove', e => {
+        if (!_panActive) return;
+        const dx = e.clientX - _panSX;
+        const dy = e.clientY - _panSY;
+        if (!_panMoved && Math.hypot(dx, dy) > 6) _panMoved = true;
+        if (_panMoved) {
+            camera.tx = _panTX + dx;
+            camera.ty = _panTY + dy;
+            canvas.style.cursor = 'grabbing';
+        }
+    });
+
+    window.addEventListener('mouseup', e => {
+        if (e.button !== 0) return;
+        canvas.style.cursor = '';
+        // If it was a real drag, suppress the UI click that fires next
+        if (_panMoved) e._suppressSimClick = true;
+        _panActive = false;
+    });
+
+    // Double-click to reset zoom
+    canvas.addEventListener('dblclick', e => {
+        camera.scale = 1; camera.tx = 0; camera.ty = 0;
+        updateZoomUI();
+        e.stopImmediatePropagation(); // don't also select entity
+    });
+
+    // Patch UI click handler to ignore pan-end events
+    const _origClick = canvas.onclick;
+    canvas.addEventListener('click', e => { if (e._suppressSimClick) e.stopImmediatePropagation(); }, true);
 
     try {
         window.world = new World(canvas, SIM_PARAMS.seed);
@@ -219,7 +318,6 @@ function startSim() {
     }
 }
 
-// Wait for full layout paint before measuring canvas container
 window.addEventListener('load', () => setTimeout(startSim, 50));
 </script>
 </body>

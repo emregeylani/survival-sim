@@ -1,13 +1,18 @@
 // ─── Animal ───────────────────────────────────────────────────────────────────
 // Herbivore and Carnivore share this class. type ∈ 'herbivore'|'carnivore'.
 // State machine: idle → seeking_food | fleeing | reproducing
+//
+// Changes vs original:
+//   • Spawns a Carcass on death — feeds Scavengers
+//   • lineageId: inherited from parent; colour shifts by lineage for speciation visual
+//   • Mating distance limit (SIM_PARAMS.maxMatingRange) — enables geographic isolation
 
 const ANIMAL_STATES = { IDLE: 'idle', FOOD: 'food', FLEE: 'flee', MATE: 'mate' };
 
 class Animal extends Living {
     constructor(x, y, type, genes = null) {
         const baseGenes = Genetics.defaultGenes({
-            speed:            1.0 + Math.random() * 0.6,
+            speed:            0.25 + Math.random() * 0.15,
             visionRange:      65  + Math.random() * 50,
             strength:         type === 'carnivore'
                                 ? 1.2 + Math.random() * 0.6
@@ -21,19 +26,18 @@ class Animal extends Living {
 
         super(x, y, genes || baseGenes);
 
-        this.type                = type;
-        this.energy              = 70 + Math.random() * 50;
-        this.maxEnergy           = 160;
-        this.maxAge              = 350 + Math.random() * 250;
+        this.type                 = type;
+        this.energy               = 70 + Math.random() * 50;
+        this.maxEnergy            = 160;
+        this.maxAge               = 350 + Math.random() * 250;
         this.reproductionCooldown = 80 + Math.random() * 40;
-        this.state               = ANIMAL_STATES.IDLE;
-        this.direction           = Math.random() * Math.PI * 2;
-        this.target              = null;
-        this.killCount           = 0;
-        this.turnCooldown        = 0;
+        this.state                = ANIMAL_STATES.IDLE;
+        this.direction            = Math.random() * Math.PI * 2;
+        this.target               = null;
+        this.killCount            = 0;
+        this.turnCooldown         = 0;
 
-        // Visual
-        this._renderR = 3 + (this.genes.size || 1) * 1.5;
+        this._renderR             = 3 + (this.genes.size || 1) * 1.5;
     }
 
     // ─── Update ─────────────────────────────────────────────────────────
@@ -42,42 +46,39 @@ class Animal extends Living {
         this.reproductionCooldown -= dt;
         this.turnCooldown -= dt;
 
-        // BUG FIX: death check must run before any early return.
-        // Previously animals on water tiles hit `return` before reaching the
-        // death check at the bottom — making them immortal if edge-stuck.
         if (this.energy <= 0 || this.age > this.maxAge) {
             this.alive = false;
+            this._spawnCarcass(entities);
             return;
         }
 
         const biome = world.getBiomeAt(this.x, this.y);
 
         if (!biome || biome.type === 'water') {
-            // Small drain even on water — no free lunch for edge-huggers
             this.energy -= dt * 0.08;
             this._turnAround();
             this._move(world, 0.5);
             return;
         }
 
-        // Energy drain — size, speed and biome affect cost
-        const meta = this.genes.metabolism || 1.0;
-        const bmul = this.biomeMultiplier(biome);
-        // FIX: drain was too aggressive — reduced base 0.18→0.12, size coeff 0.06→0.04, speed coeff 0.04→0.025
-        // Old formula killed animals in ~420 ticks even when eating normally
-        const seasonDrain = window.SEASON ? (2.0 - window.SEASON.mult) : 1.0; // winter=1.55×, summer=1.0×, spring=0.9×
+        const meta        = this.genes.metabolism || 1.0;
+        const bmul        = this.biomeMultiplier(biome);
+        const isHarsh     = window.SEASON && window.SEASON.mult < 0.8;
+        const noctBonus   = isHarsh ? (this.genes.nocturnalAdaptation || 0.3) * 0.3 : 0;
+        const seasonDrain = window.SEASON
+            ? Math.max(0.5, (2.0 - window.SEASON.mult) - noctBonus)
+            : 1.0;
         const drain = dt * (0.12 + (this.genes.size || 1) * 0.04 + (this.genes.speed || 1) * 0.025)
                          * meta * seasonDrain / Math.max(0.1, bmul);
         this.energy -= drain;
 
         this.hunger = Math.max(0, Math.min(100, (1 - this.energy / this.maxEnergy) * 100));
 
-        // Get nearby entities
         const nearby = grid
             ? grid.getNearby(this.x, this.y, this.genes.visionRange).filter(e => e.alive && e !== this)
             : entities.filter(e => e.alive && e !== this && this.distanceTo(e) < this.genes.visionRange);
 
-        // Apply camouflage: predators with camouflage are harder to detect
+        // Camouflage: predators harder to detect
         const visibleNearby = nearby.filter(e => {
             if (e instanceof Animal && e.genes.camouflage > 0.4) {
                 return Math.random() > e.genes.camouflage * 0.5;
@@ -88,19 +89,28 @@ class Animal extends Living {
         this._decide(dt, visibleNearby, entities, world);
         this._move(world, 1.0);
 
-        if (this.energy <= 0 || this.age > this.maxAge) this.alive = false;
+        if (this.energy <= 0 || this.age > this.maxAge) {
+            this.alive = false;
+            this._spawnCarcass(entities);
+        }
+    }
+
+    // ─── Carcass Spawn ───────────────────────────────────────────────────
+    _spawnCarcass(entities) {
+        if (this._carcassSpawned) return; // prevent double-spawn
+        this._carcassSpawned = true;
+        const carcassEnergy = Math.max(12, (this.genes.size || 1) * 22 + 8);
+        entities.push(new Carcass(this.x, this.y, carcassEnergy));
     }
 
     // ─── AI State Machine ────────────────────────────────────────────────
     _decide(dt, nearby, entities, world) {
-        // Determine threats: carnivores threatening herbivores, stronger carnivores threatening weaker ones
         const threats = nearby.filter(e =>
             e instanceof Animal && e.type === 'carnivore' &&
             ((this.type === 'herbivore') ||
              (this.type === 'carnivore' && e.genes.strength > this.genes.strength * 1.25))
         );
 
-        // Food sources
         let foodTargets;
         if (this.type === 'herbivore') {
             foodTargets = nearby.filter(e => e instanceof Plant && e.energy > 8);
@@ -110,17 +120,16 @@ class Animal extends Living {
             );
         }
 
-        // Potential mates
-        // FIX: reproduction threshold lowered 90→75 — old threshold was rarely reachable given drain rates
         const mates = (this.reproductionCooldown <= 0 && this.energy > 75)
             ? nearby.filter(e =>
                 e instanceof Animal &&
                 e.type === this.type &&
                 e.energy > 65 &&
-                e.reproductionCooldown <= 0)
+                e.reproductionCooldown <= 0 &&
+                // ── Mating range limit — geographic isolation / speciation ──
+                this.distanceTo(e) < (window.SIM_PARAMS?.maxMatingRange || 180))
             : [];
 
-        // Priority: flee > eat (when very hungry) > mate > idle
         const veryHungry = this.energy < this.maxEnergy * 0.45;
         const hungry     = this.energy < this.maxEnergy * 0.70;
 
@@ -182,16 +191,15 @@ class Animal extends Living {
             this.killCount++;
 
         } else if (target instanceof Animal) {
-            // Hunt check — strength advantage required
-            const myStr    = this.genes.strength   || 1;
-            const theirStr = target.genes.strength || 1;
-            const mySize   = this.genes.size        || 1;
-            const theirSize= target.genes.size       || 1;
-            // Bigger + stronger wins; some randomness
+            const myStr     = this.genes.strength   || 1;
+            const theirStr  = target.genes.strength || 1;
+            const mySize    = this.genes.size        || 1;
+            const theirSize = target.genes.size       || 1;
             const winChance = 0.5 + (myStr * mySize - theirStr * theirSize) * 0.25;
             if (Math.random() < Math.max(0.1, Math.min(0.95, winChance))) {
                 this.energy = Math.min(this.maxEnergy, this.energy + 55);
                 target.alive = false;
+                target._spawnCarcass(entities); // spawn immediately so scavengers can find it this tick
                 this.killCount++;
             }
         }
@@ -206,20 +214,20 @@ class Animal extends Living {
         const currentPop = entities.filter(e => e instanceof Animal && e.type === this.type).length;
         if (currentPop >= maxPop) return;
 
-        const childGenes = Genetics.crossover(this.genes, mate.genes);
-        const mutated    = Genetics.mutate(childGenes);
-
         const child = new Animal(
             this.x + (Math.random() - 0.5) * 18,
             this.y + (Math.random() - 0.5) * 18,
             this.type,
-            mutated
+            Genetics.mutate(Genetics.crossover(this.genes, mate.genes))
         );
         child.generation = Math.max(this.generation, mate.generation) + 1;
         child.parentId   = this.id;
         child.energy     = 55;
+        // Lineage inheritance — very rare new lineage split
+        child.lineageId  = Math.random() < 0.005
+            ? Math.floor(Math.random() * 360)
+            : this.lineageId;
 
-        // FIX: energy cost lowered 28→20, cooldown reduced — was too punishing and killed parents post-birth
         this.energy -= 20;
         mate.energy  -= 20;
         this.reproductionCooldown = 70 + Math.random() * 30;
@@ -236,7 +244,6 @@ class Animal extends Living {
         let nx = this.x + Math.cos(this.direction) * spd;
         let ny = this.y + Math.sin(this.direction) * spd;
 
-        // Clamp to world
         nx = Math.max(5, Math.min(world.width  - 5, nx));
         ny = Math.max(5, Math.min(world.height - 5, ny));
 
@@ -256,33 +263,34 @@ class Animal extends Living {
         const r     = this._renderR;
         const ratio = this.energy / this.maxEnergy;
 
+        // Lineage-tinted hue within species colour band
         let hue, sat;
         if (this.type === 'herbivore') {
-            hue = 210; sat = 55 + (this.genes.speed || 1) * 15;
+            hue = 190 + ((this.lineageId || 0) % 50); // 190-240 (blue band)
+            sat = 50 + (this.genes.speed || 1) * 14;
         } else {
-            hue = 4;   sat = 60 + (this.genes.strength || 1) * 12;
+            hue = (350 + ((this.lineageId || 0) % 35)) % 360; // 350-25 (red-orange band)
+            sat = 55 + (this.genes.strength || 1) * 12;
         }
         const lit = 28 + ratio * 36;
 
         ctx.save();
         ctx.translate(this.x, this.y);
-        ctx.rotate(this.direction); // arrow always points in movement direction
+        ctx.rotate(this.direction);
 
-        // Arrow / chevron shape — nose at +x, tail at -x
         ctx.fillStyle = `hsl(${hue}, ${sat}%, ${lit}%)`;
         ctx.beginPath();
-        ctx.moveTo( r * 1.55,  0);           // nose tip
-        ctx.lineTo(-r * 0.75, -r * 0.95);    // left tail wing
-        ctx.lineTo(-r * 0.25,  0);            // tail notch (gives chevron indent)
-        ctx.lineTo(-r * 0.75,  r * 0.95);    // right tail wing
+        ctx.moveTo( r * 1.55,  0);
+        ctx.lineTo(-r * 0.75, -r * 0.95);
+        ctx.lineTo(-r * 0.25,  0);
+        ctx.lineTo(-r * 0.75,  r * 0.95);
         ctx.closePath();
         ctx.fill();
 
-        // State colour fill on body centre
         if (this.state !== ANIMAL_STATES.IDLE) {
             ctx.fillStyle = this.state === ANIMAL_STATES.FLEE ? 'rgba(255,80,60,0.75)'
                           : this.state === ANIMAL_STATES.FOOD ? 'rgba(255,210,40,0.75)'
-                          : 'rgba(0,212,170,0.75)'; // mate
+                          : 'rgba(0,212,170,0.75)';
             ctx.beginPath();
             ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2);
             ctx.fill();
@@ -296,8 +304,6 @@ class Animal extends Living {
             ctx.beginPath();
             ctx.arc(this.x, this.y, r + 3, 0, Math.PI * 2);
             ctx.stroke();
-
-            // Vision ring
             ctx.strokeStyle = 'rgba(255,255,255,0.15)';
             ctx.lineWidth   = 0.5;
             ctx.beginPath();
