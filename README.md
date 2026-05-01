@@ -1,178 +1,179 @@
-# survival-sim
+# Survival Simulation
 
-Gerçek zamanlı evrim ve ekosistem simülasyonu. Bitki, böcek, ot oburu, et oburu, leş yiyici ve kuşlardan oluşan 6 katmanlı bir besin zinciri; mevsimler, doğal afetler ve coğrafi izolasyon ile evrimsel baskı altında çalışır.
+A real-time evolution and ecosystem simulation. Six trophic layers — plants, insects, herbivores, carnivores, scavengers, and birds — evolve under pressure from seasons, natural disasters, and geographic isolation.
 
 ---
 
-## Hızlı Başlangıç
+## Quick Start
 
 ```bash
 npx serve .
-# veya
+# or
 python -m http.server 8080
 ```
 
-`index.html` doğrudan tarayıcıda açılabilir — tüm dosyalar lokal, CORS kısıtlaması yok.
+`index.html` can also be opened directly in a browser — all files are local, no CORS issues.
 
 ---
 
-## Dosya Yapısı
+## File Structure
 
 ```
 survival-sim/
-├── index.html               # Giriş noktası, canvas kurulumu, kamera sistemi
-├── style.css                # Tüm UI stilleri
+├── index.html               # Entry point, canvas setup, camera system
+├── style.css                # All UI styles
 │
 ├── engine/
-│   ├── genetics.js          # Gen tanımları, mutasyon, crossover, SpatialGrid
-│   ├── world.js             # Biome haritası (Perlin noise tabanlı)
-│   └── loop.js              # Simülasyon döngüsü, mevsim, analitik
+│   ├── genetics.js          # Gene definitions, mutation, crossover, SpatialGrid
+│   ├── world.js             # Biome map generation (Perlin noise)
+│   └── loop.js              # Main simulation loop, seasons, analytics
 │
 ├── entities/
-│   ├── Living.js            # Temel sınıf: konum, enerji, biomeMultiplier
-│   ├── Plant.js             # Üretici — 3 büyüme evresi, yayılma
-│   ├── Insect.js            # Birincil tüketici — kanat animasyonu, hızlı üreme
-│   ├── Carcass.js           # Geçici — taze pencere (~140-200 tick), çürüme
-│   ├── Animal.js            # Herbivore / Carnivore — state machine, carcass bırakır
-│   ├── Scavenger.js         # Sadece taze leş, etobulardan kaçar
-│   └── Bird.js              # Böcek avcısı; strength > 1.5 → herbivore dive attack
+│   ├── Living.js            # Base class: position, energy, biomeMultiplier
+│   ├── Plant.js             # Producer — 3 growth stages, spreading logic
+│   ├── Insect.js            # Primary consumer — wing animation, fast reproduction
+│   ├── Carcass.js           # Temporary object — fresh window (~140–200 ticks), decay
+│   ├── Animal.js            # Herbivore / Carnivore — full state machine, drops carcass on death
+│   ├── Scavenger.js         # Eats only fresh carcasses, flees carnivores
+│   └── Bird.js              # Insect hunter; strength > 1.5 unlocks herbivore dive attack
 │
 ├── events/
-│   └── disasters.js         # Meteor, volkan, buzul çağı, kuraklık
+│   └── disasters.js         # Meteor, volcano, ice age, drought
 │
 └── ui/
-    ├── analytics.js         # Chart.js popülasyon + evrim grafikleri, Hall of Fame
+    ├── analytics.js         # Chart.js population + evolution charts, Hall of Fame
     ├── panel.js             # Entity / terrain inspector
-    └── controls.js          # Oynat/duraklat, hız, afet, parametre slider
+    └── controls.js          # Play/pause, speed, disaster buttons, param sliders
 ```
 
 ---
 
-## Besin Zinciri
+## Food Chain
 
 ```
-Güneş
+Sun
   └─► Plant
         ├─► Insect  ──────────────────► Bird
-        │                                 └──► [Herbivore]  ← (strength > 1.5 evrimleşince)
+        │                                 └──► [Herbivore]  (once strength > 1.5 evolves)
         └─► Herbivore ──► Carnivore
                                │
                                ▼
-                           Carcass  ◄── (her hayvan ölünce)
-                               └─► Scavenger  (taze pencere içinde)
+                           Carcass  ◄── (spawned on every animal death)
+                               └─► Scavenger  (within fresh window only)
 ```
 
 ---
 
-## Genetik Sistem
+## Genetic System
 
-Her canlı **12 gen** taşır. Nesiller arası **crossover** (dominant/resesif, %10 blend) ve **mutasyon** ile evrimleşir.
+Every entity carries **12 genes**. Evolution happens through **crossover** (dominant/recessive, 10% blend) and **mutation** across generations.
 
-| Gen | Etki |
-|-----|------|
-| `speed` | Hareket hızı |
-| `visionRange` | Algı yarıçapı |
-| `strength` | Dövüş/avlanma; Bird'de 1.5+ eşiği dive attack açar |
-| `size` | Vücut büyüklüğü; enerji tüketimini artırır, dövüşte avantaj |
-| `metabolism` | Enerji verimliliği (düşük = verimli) |
-| `reproductionRate` | Üreme olasılığı çarpanı |
-| `camouflage` | Predator algı şansını düşürür |
-| `coldResistance` | Kar/dondurma biome'larında etkinlik |
-| `heatResistance` | Çöl/kuraklık biome'larında etkinlik |
-| `toxinResistance` | Volkanik/scorched alanlarda hayatta kalma |
-| `nocturnalAdaptation` | Sonbahar/Kış enerji kaybını azaltır |
-| `aquaticAdaptation` | Wetland biome'unda enerji bonusu |
+| Gene | Effect |
+|------|--------|
+| `speed` | Movement speed |
+| `visionRange` | Perception radius |
+| `strength` | Combat / hunting power; unlocks Bird dive attack above 1.5 |
+| `size` | Body size — increases energy drain, advantages in combat |
+| `metabolism` | Energy efficiency (lower = more efficient) |
+| `reproductionRate` | Reproduction probability multiplier |
+| `camouflage` | Reduces chance of being spotted by predators |
+| `coldResistance` | Effectiveness in snow / frozen biomes |
+| `heatResistance` | Effectiveness in desert / drought biomes |
+| `toxinResistance` | Survival in volcanic / scorched areas |
+| `nocturnalAdaptation` | Reduces energy drain during Autumn / Winter |
+| `aquaticAdaptation` | Energy bonus in wetland biome |
 
-### Türleşme
-`maxMatingRange` çiftleşme mesafesini sınırlar. İzole kalan popülasyonlar farklı gen frekanslarına kayar. `lineageId` renk bandı ile görsel olarak ayrışır.
-
----
-
-## Biyomlar
-
-| Biyom | Kaynak | Evrimsel Baskı |
-|-------|--------|----------------|
-| Forest | Maksimum | — |
-| Wetland | Yüksek | `aquaticAdaptation` ödüllenir |
-| Grassland | Yüksek | — |
-| Savanna | Orta | `speed` ödüllenir |
-| Desert | Düşük | `heatResistance` gerekli |
-| Snow | Düşük | `coldResistance` gerekli |
-| Volcanic | Neredeyse yok | `toxinResistance` gerekli |
-| Water | — | Geçilemez (Bird uçabilir) |
+### Speciation
+`maxMatingRange` caps the distance at which two entities can mate. Geographically isolated populations drift toward different gene frequencies. Individuals of the same species are visually tinted by `lineageId` to make divergence visible.
 
 ---
 
-## Mevsimler
+## Biomes
 
-Her **500 tick**'te döner:
-
-| Mevsim | Çarpan | Etki |
-|--------|--------|------|
-| 🌱 Bahar | ×1.1 | Bitki patlaması |
-| ☀ Yaz | ×1.0 | Baz durum |
-| 🍂 Sonbahar | ×0.75 | Artan tüketim |
-| ❄ Kış | ×0.45 | Ağır baskı; `nocturnalAdaptation` avantajlı |
-
----
-
-## Afetler
-
-| Afet | Tetikleme | Etki |
-|------|-----------|------|
-| ☄ Meteor | Tıkla → haritaya yönlendir | Alan hasarı + biome değişimi |
-| 🌋 Volkan | Tıkla → haritaya yönlendir | Kalıcı lav alanı |
-| ❄ Buzul Çağı | Anında | Haritaya kar yayılır |
-| ☀ Kuraklık | Anında | Yeşil alanlar kurur |
+| Biome | Resources | Evolutionary Pressure |
+|-------|-----------|----------------------|
+| Forest | Maximum | — |
+| Wetland | High | `aquaticAdaptation` rewarded |
+| Grassland | High | — |
+| Savanna | Medium | `speed` rewarded (open terrain) |
+| Desert | Low | `heatResistance` required |
+| Snow | Low | `coldResistance` required |
+| Volcanic | Minimal | `toxinResistance` required |
+| Water | — | Impassable (Birds can cross) |
 
 ---
 
-## Parametreler
+## Seasons
 
-| Parametre | Varsayılan | Açıklama |
-|-----------|-----------|----------|
-| Mutation Rate | 0.15 | Gen başına mutasyon olasılığı |
-| Plant Spread | 0.30 | Bitki yayılma agresifliği |
-| Max Herbivores | 300 | Popülasyon tavanı |
-| Max Carnivores | 100 | Popülasyon tavanı |
-| Max Plants | 500 | Popülasyon tavanı |
-| Max Scavengers | 80 | Popülasyon tavanı |
-| Max Birds | 100 | Popülasyon tavanı |
-| Mating Range | 180px | Çiftleşme mesafe limiti — düşür → türleşme hızlanır |
-| World Seed | Rastgele | Aynı seed = aynı harita |
+Cycle every **500 ticks**:
+
+| Season | Multiplier | Effect |
+|--------|-----------|--------|
+| 🌱 Spring | ×1.1 | Plant boom, easy reproduction |
+| ☀ Summer | ×1.0 | Baseline |
+| 🍂 Autumn | ×0.75 | Increased energy drain |
+| ❄ Winter | ×0.45 | Heavy pressure; `nocturnalAdaptation` advantaged |
 
 ---
 
-## Kamera
+## Disasters
 
-| Eylem | Kontrol |
-|-------|---------|
-| Zoom in/out | Mouse tekerleği |
-| Pan | Sol tıkla sürükle |
-| Sıfırla | Çift tık |
-
----
-
-## Evrimsel Gözlem İpuçları
-
-**Türleşme:**
-- `Mating Range` → 60–80 px yap → coğrafi izolasyon artar, renk bantları ayrışır
-- `Mutation Rate` → 0.25+ yap → gen sürüklenmesi hızlanır
-
-**Niche ayrışması:**
-- Wetland bölgesini yakınlaştır → `aquaticAdaptation` yüksek bireyler yoğunlaşır
-- Kış sonrası leş patlaması → Scavenger artışı + `nocturnalAdaptation` seçilimi
-- Bird artınca Insect azalır → Herbivore üzerindeki baskı hafifler
-
-**Bird dive attack evrimi:**
-`strength > 1.5` eşiği geçince otomatik açılır. ENTITY panelinde `Dive Hunter` etiketi ve turuncu gaga highlight belirir.
+| Disaster | Trigger | Effect |
+|----------|---------|--------|
+| ☄ Meteor | Click button → aim on map | Area damage + biome change |
+| 🌋 Volcano | Click button → aim on map | Permanent lava zone |
+| ❄ Ice Age | Instant | Snow spreads across the map |
+| ☀ Drought | Instant | Green areas wither |
 
 ---
 
-## Teknik Notlar
+## Parameters
 
-- **SpatialGrid**: 80 px hücre boyutu, O(n²) → O(1) yakınlık sorgusu
-- **Carcass fresh window**: ~140–200 tick; Scavenger bu süre sonra yiyemez, leş solar
-- **Double-spawn koruması**: `_carcassSpawned` flag ile aynı ölümden iki Carcass oluşması engellenir
-- **Render sırası**: Carcass → Plant → hareketli varlıklar
-- Tüm varlıklar `ctx.save/translate/rotate/restore` ile kamera transform'undan bağımsız render edilir
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| Mutation Rate | 0.15 | Per-gene mutation probability (0–0.5) |
+| Plant Spread | 0.30 | Plant spreading aggressiveness |
+| Max Herbivores | 300 | Population cap |
+| Max Carnivores | 100 | Population cap |
+| Max Plants | 500 | Population cap |
+| Max Scavengers | 80 | Population cap |
+| Max Birds | 100 | Population cap |
+| Mating Range | 180 px | Mating distance limit — lower = faster speciation |
+| World Seed | Random | Same seed = same map |
+
+---
+
+## Camera Controls
+
+| Action | Control |
+|--------|---------|
+| Zoom in / out | Mouse wheel |
+| Pan | Left-click drag |
+| Reset view | Double-click |
+| Zoom level | Indicator in bottom-right corner |
+
+---
+
+## Evolution Observation Tips
+
+**To observe speciation:**
+- Set `Mating Range` to 60–80 px → geographic isolation increases, colour bands diverge
+- Set `Mutation Rate` to 0.25+ → gene drift accelerates
+
+**To observe niche divergence:**
+- Zoom into a wetland area → entities with high `aquaticAdaptation` should cluster there
+- Watch after Winter: mass die-off → carcass surge → Scavenger boom + `nocturnalAdaptation` selection
+- As Bird population grows, Insect count drops → pressure on Herbivores from Carnivores increases
+
+**To observe Bird dive attack evolution:**
+Unlocks automatically once `genes.strength > 1.5`. The `Dive Hunter` trait tag appears in the ENTITY panel and the beak gains an orange highlight.
+
+---
+
+## Technical Notes
+
+- **SpatialGrid** — 80 px cell size, reduces proximity queries from O(n²) to ~O(1)
+- **Carcass fresh window** — ~140–200 ticks; Scavengers cannot feed after this, carcass fades visually
+- **Double-spawn guard** — `_carcassSpawned` flag prevents two Carcass objects from one death event
+- **Render order** — Carcass → Plant → moving entities (z-order)
+- All entities render via `ctx.save / translate / rotate / restore`, independent of camera transform
