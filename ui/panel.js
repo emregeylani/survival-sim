@@ -121,7 +121,7 @@ const UI = {
 
     _geneRow(key, val) {
         const defs = {
-            speed:               { min: 0.08, max: 0.75 },
+            speed:               { min: 0.02, max: 0.20 },
             visionRange:         { min: 20,   max: 200 },
             strength:            { min: 0.3,  max: 3   },
             size:                { min: 0.5,  max: 3   },

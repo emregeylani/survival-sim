@@ -2,7 +2,7 @@
 // Handles gene definitions, mutation, crossover, trait descriptions, fitness.
 
 const GENE_DEFS = {
-    speed:               { min: 0.08, max: 0.75,  base: 0.25, strength: 0.03 },
+    speed:               { min: 0.02, max: 0.20,  base: 0.07, strength: 0.01 },
     visionRange:         { min: 20,   max: 200,   base: 70,   strength: 8    },
     strength:            { min: 0.3,  max: 3.0,   base: 1.0,  strength: 0.12 },
     size:                { min: 0.5,  max: 3.0,   base: 1.0,  strength: 0.10 },
@@ -22,8 +22,8 @@ const GENE_DEFS = {
 
 // Trait descriptions for display
 const TRAIT_DESCRIPTORS = [
-    { gene: 'speed',               threshold: 0.50, label: 'Swift',          positive: true  },
-    { gene: 'speed',               threshold: 0.15, label: 'Sluggish',       positive: false, below: true },
+    { gene: 'speed',               threshold: 0.13, label: 'Swift',          positive: true  },
+    { gene: 'speed',               threshold: 0.04, label: 'Sluggish',       positive: false, below: true },
     { gene: 'visionRange',         threshold: 130,  label: 'Eagle-Eyed',     positive: true  },
     { gene: 'visionRange',         threshold: 35,   label: 'Near-Sighted',   positive: false, below: true },
     { gene: 'strength',            threshold: 1.6,  label: 'Powerful',       positive: true  },

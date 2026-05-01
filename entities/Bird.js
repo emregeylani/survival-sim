@@ -11,7 +11,7 @@
 class Bird extends Living {
     constructor(x, y, genes = null) {
         super(x, y, genes || Genetics.defaultGenes({
-            speed:              0.5 + Math.random() * 0.2,
+            speed:              0.125 + Math.random() * 0.05,
             visionRange:        120 + Math.random() * 60,
             strength:           0.4  + Math.random() * 0.4,
             size:               0.55 + Math.random() * 0.30,
