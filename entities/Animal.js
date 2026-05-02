@@ -12,7 +12,7 @@ const ANIMAL_STATES = { IDLE: 'idle', FOOD: 'food', FLEE: 'flee', MATE: 'mate' }
 class Animal extends Living {
     constructor(x, y, type, genes = null) {
         const baseGenes = Genetics.defaultGenes({
-            speed:            0.06 + Math.random() * 0.04,
+            speed:            0.36 + Math.random() * 0.24,
             visionRange:      65  + Math.random() * 50,
             strength:         type === 'carnivore'
                                 ? 1.2 + Math.random() * 0.6

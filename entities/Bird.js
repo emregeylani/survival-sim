@@ -11,7 +11,7 @@
 class Bird extends Living {
     constructor(x, y, genes = null) {
         super(x, y, genes || Genetics.defaultGenes({
-            speed:              0.125 + Math.random() * 0.05,
+            speed:              0.75 + Math.random() * 0.30,
             visionRange:        120 + Math.random() * 60,
             strength:           0.4  + Math.random() * 0.4,
             size:               0.55 + Math.random() * 0.30,
@@ -39,6 +39,7 @@ class Bird extends Living {
     }
 
     update(dt, world, entities, grid) {
+        this._entities = entities; // keep ref for fish carcass spawning
         this.age += dt;
         this.reproductionCooldown -= dt;
         this.turnCooldown -= dt;
@@ -78,13 +79,15 @@ class Bird extends Living {
             ? grid.getNearby(this.x, this.y, this.genes.visionRange).filter(e => e.alive && e !== this)
             : entities.filter(e => e.alive && e !== this && this.distanceTo(e) < this.genes.visionRange);
 
-        // Food sources: insects always, small herbivores if strength evolved enough
+        // Food sources: insects always, small herbivores if strength evolved enough, fish always
         const insects = nearby.filter(e => e instanceof Insect);
         const canHuntHerbivore = (this.genes.strength || 0.4) > 1.5;
         const smallHerbivores  = canHuntHerbivore
             ? nearby.filter(e => e instanceof Animal && e.type === 'herbivore' && (e.genes.size || 1) < 0.8)
             : [];
-        const foodTargets = [...insects, ...smallHerbivores];
+        // Birds can dive for fish regardless of water tile (they fly)
+        const fishTargets = nearby.filter(e => e instanceof Fish);
+        const foodTargets = [...insects, ...smallHerbivores, ...fishTargets];
 
         const hungry     = this.energy < this.maxEnergy * 0.75;
         const veryHungry = this.energy < this.maxEnergy * 0.45;
@@ -99,6 +102,17 @@ class Bird extends Living {
                         this.energy = Math.min(this.maxEnergy, this.energy + 24);
                         this.target.alive = false;
                         this.killCount++;
+
+                    } else if (this.target instanceof Fish) {
+                        // Fish have camouflage — harder to catch
+                        const camouflage = this.target.genes.camouflage || 0.3;
+                        const catchChance = Math.max(0.15, 0.75 - camouflage * 0.55);
+                        if (Math.random() < catchChance) {
+                            this.energy = Math.min(this.maxEnergy, this.energy + 38);
+                            this.target.alive = false;
+                            this.target._spawnCarcass(this._entities || entities);
+                            this.killCount++;
+                        }
 
                     } else if (this.target instanceof Animal) {
                         // Dive attack: harder the bigger the prey

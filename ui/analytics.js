@@ -27,6 +27,7 @@ const Analytics = {
                     { label: 'Insects',    data: [], borderColor: '#ffd040', backgroundColor: 'rgba(255,208,64,0.07)',  tension: 0.4, pointRadius: 0, borderWidth: 1.5 },
                     { label: 'Scavengers', data: [], borderColor: '#c878ff', backgroundColor: 'rgba(200,120,255,0.07)', tension: 0.4, pointRadius: 0, borderWidth: 1.5 },
                     { label: 'Birds',      data: [], borderColor: '#40d4aa', backgroundColor: 'rgba(64,212,170,0.07)',  tension: 0.4, pointRadius: 0, borderWidth: 1.5 },
+                    { label: 'Fish',       data: [], borderColor: '#38b8ff', backgroundColor: 'rgba(56,184,255,0.07)',  tension: 0.4, pointRadius: 0, borderWidth: 1.5 },
                 ],
             },
             options: {
@@ -101,6 +102,7 @@ const Analytics = {
         this.chart.data.datasets[3].data = this.history.map(h => h.insects);
         this.chart.data.datasets[4].data = this.history.map(h => h.scavengers || 0);
         this.chart.data.datasets[5].data = this.history.map(h => h.birds      || 0);
+        this.chart.data.datasets[6].data = this.history.map(h => h.fish       || 0);
         this.chart.update('none');
 
         document.getElementById('stat-tick').textContent       = tick;
@@ -110,6 +112,7 @@ const Analytics = {
         document.getElementById('stat-insects').textContent    = counts.insects;
         document.getElementById('stat-scavengers').textContent = counts.scavengers || 0;
         document.getElementById('stat-birds').textContent      = counts.birds      || 0;
+        document.getElementById('stat-fish').textContent       = counts.fish       || 0;
 
         this._updateHOF(entities, tick);
         document.getElementById('stat-maxgen').textContent = this.hof.topGen;

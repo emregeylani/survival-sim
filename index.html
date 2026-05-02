@@ -43,6 +43,10 @@
             <span class="stat-label" style="color:#40d4aa">BIRD</span>
             <span id="stat-birds" class="stat-value" style="color:#40d4aa">0</span>
         </div>
+        <div class="stat-group">
+            <span class="stat-label" style="color:#38b8ff">FISH</span>
+            <span id="stat-fish" class="stat-value" style="color:#38b8ff">0</span>
+        </div>
         <div class="stat-divider"></div>
         <div class="stat-group">
             <span class="stat-label">MAX GEN</span>
@@ -168,10 +172,11 @@
         <div id="time-controls">
             <button id="btn-play-pause" class="ctrl-btn active">⏸ PAUSE</button>
             <div class="speed-group">
-                <button class="speed-btn active" data-speed="1">1×</button>
-                <button class="speed-btn" data-speed="3">3×</button>
-                <button class="speed-btn" data-speed="7">7×</button>
-                <button class="speed-btn" data-speed="15">15×</button>
+                <button class="speed-btn active" data-speed="0.1">1</button>
+                <button class="speed-btn" data-speed="0.25">2</button>
+                <button class="speed-btn" data-speed="0.5">3</button>
+                <button class="speed-btn" data-speed="1">4</button>
+                <button class="speed-btn" data-speed="2">5</button>
             </div>
         </div>
         <div class="ctrl-divider"></div>
@@ -196,6 +201,7 @@
 <script src="entities/Animal.js"></script>
 <script src="entities/Scavenger.js"></script>
 <script src="entities/Bird.js"></script>
+<script src="entities/Fish.js"></script>
 <script src="events/disasters.js"></script>
 <script src="ui/panel.js"></script>
 <script src="ui/controls.js"></script>
@@ -222,7 +228,9 @@ function startSim() {
         maxPlants:     500,
         maxScavengers: 80,
         maxBirds:      100,
+        maxFish:       120,
         maxMatingRange: 180,
+        simSpeed:       0.1,
         seed: Math.floor(Math.random() * 99999),
     };
 
@@ -296,6 +304,17 @@ function startSim() {
     // Patch UI click handler to ignore pan-end events
     const _origClick = canvas.onclick;
     canvas.addEventListener('click', e => { if (e._suppressSimClick) e.stopImmediatePropagation(); }, true);
+
+    // Spacebar always toggles pause
+    window.addEventListener('keydown', e => {
+        if (e.code === 'Space' && e.target.tagName !== 'INPUT') {
+            e.preventDefault();
+            const playBtn = document.getElementById('btn-play-pause');
+            window.sim.paused = !window.sim.paused;
+            playBtn.textContent = window.sim.paused ? '▶ PLAY' : '⏸ PAUSE';
+            playBtn.classList.toggle('paused', window.sim.paused);
+        }
+    });
 
     try {
         window.world = new World(canvas, SIM_PARAMS.seed);

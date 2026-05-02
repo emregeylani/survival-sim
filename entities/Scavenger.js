@@ -8,7 +8,7 @@
 class Scavenger extends Living {
     constructor(x, y, genes = null) {
         super(x, y, genes || Genetics.defaultGenes({
-            speed:              0.07 + Math.random() * 0.03,
+            speed:              0.42 + Math.random() * 0.18,
             visionRange:        90  + Math.random() * 50,
             strength:           0.5,
             size:               0.75 + Math.random() * 0.35,

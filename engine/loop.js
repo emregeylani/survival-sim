@@ -15,6 +15,7 @@ class SimulationLoop {
             herbivore: false, carnivore: false,
             insect: false,    plant: false,
             scavenger: false, bird: false,
+            fish: false,
         };
         this._lastCounts    = {};
 
@@ -49,6 +50,19 @@ class SimulationLoop {
         tryPlace(60,  (x, y) => new Insect(x, y));
         tryPlace(14,  (x, y) => new Scavenger(x, y));
         tryPlace(18,  (x, y) => new Bird(x, y));
+
+        // Fish — place specifically in water tiles
+        let fishPlaced = 0, fishTries = 0;
+        while (fishPlaced < 25 && fishTries < 500) {
+            fishTries++;
+            const x = 12 + Math.random() * (W - 24);
+            const y = 12 + Math.random() * (H - 24);
+            const b = this.world.getBiomeAt(x, y);
+            if (b && b.type === 'water') {
+                this.entities.push(new Fish(x, y));
+                fishPlaced++;
+            }
+        }
     }
 
     // ── Main Loop ────────────────────────────────────────────────────────
@@ -73,6 +87,7 @@ class SimulationLoop {
             herbivore: false, carnivore: false,
             insect: false,    plant: false,
             scavenger: false, bird: false,
+            fish: false,
         };
         this._grid        = new SpatialGrid(newWorld.width, newWorld.height, 80);
         Living._nextId    = 0;
@@ -86,7 +101,7 @@ class SimulationLoop {
     // ── Single Tick ──────────────────────────────────────────────────────
     _step() {
         this.tick++;
-        const dt = 1;
+        const dt = 1 * (window.SIM_PARAMS?.simSpeed ?? 0.25);
 
         this._grid.clear();
         for (const e of this.entities) {
@@ -157,7 +172,7 @@ class SimulationLoop {
     _updateAnalytics() {
         const counts = {
             plants: 0, herbivores: 0, carnivores: 0,
-            insects: 0, scavengers: 0, birds: 0, carcasses: 0,
+            insects: 0, scavengers: 0, birds: 0, carcasses: 0, fish: 0,
         };
 
         let speedSum = 0, strengthSum = 0, maxGen = 0, animalCount = 0;
@@ -170,6 +185,7 @@ class SimulationLoop {
             else if (e instanceof Insect)    counts.insects++;
             else if (e instanceof Scavenger) counts.scavengers++;
             else if (e instanceof Bird)      counts.birds++;
+            else if (e instanceof Fish)      counts.fish++;
             else if (e instanceof Animal) {
                 if (e.type === 'herbivore') counts.herbivores++;
                 else                        counts.carnivores++;
@@ -200,6 +216,7 @@ class SimulationLoop {
         this._checkExtinction('plant',     counts.plants     === 0);
         this._checkExtinction('scavenger', counts.scavengers === 0);
         this._checkExtinction('bird',      counts.birds      === 0);
+        this._checkExtinction('fish',      counts.fish       === 0);
     }
 
     _checkExtinction(key, isZero) {

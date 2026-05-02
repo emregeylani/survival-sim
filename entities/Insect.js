@@ -3,7 +3,7 @@
 class Insect extends Living {
     constructor(x, y, genes = null) {
         super(x, y, genes || Genetics.defaultGenes({
-            speed:            0.375 + Math.random() * 0.2,
+            speed:            2.25 + Math.random() * 1.2,
             visionRange:      35  + Math.random() * 20,
             strength:         0.3,
             size:             0.5,

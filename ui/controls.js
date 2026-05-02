@@ -34,7 +34,8 @@ const Controls = {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                this.sim.ticksPerFrame = parseInt(btn.dataset.speed);
+                // simSpeed controls dt multiplier; ticksPerFrame stays at 1
+                window.SIM_PARAMS.simSpeed = parseFloat(btn.dataset.speed);
             });
         });
     },

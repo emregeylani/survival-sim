@@ -121,7 +121,7 @@ const UI = {
 
     _geneRow(key, val) {
         const defs = {
-            speed:               { min: 0.02, max: 0.20 },
+            speed:               { min: 0.12, max: 1.20 },
             visionRange:         { min: 20,   max: 200 },
             strength:            { min: 0.3,  max: 3   },
             size:                { min: 0.5,  max: 3   },
@@ -160,6 +160,7 @@ const UI = {
             insect:    '#ffd040',
             scavenger: '#c878ff',
             bird:      '#40d4aa',
+            fish:      '#38b8ff',
             carcass:   '#7a5030',
         }[type] || '#aaa';
     },
@@ -172,6 +173,7 @@ const UI = {
             insect:    'INSECT',
             scavenger: 'SCAVENGER',
             bird:      'BIRD',
+            fish:      'FISH',
             carcass:   'CARCASS',
         }[type] || type.toUpperCase();
     },
@@ -209,7 +211,7 @@ const UI = {
             : '<span style="color:#ff4a3a">IMPASSABLE</span>';
 
         const r2 = 40 * 40;
-        let plants = 0, herbs = 0, carns = 0, insects = 0, scavs = 0, birds = 0, carcasses = 0;
+        let plants = 0, herbs = 0, carns = 0, insects = 0, scavs = 0, birds = 0, carcasses = 0, fish = 0;
         for (const e of this.sim.entities) {
             if (!e.alive) continue;
             const dx = e.x - mx, dy = e.y - my;
@@ -219,6 +221,7 @@ const UI = {
             else if (e instanceof Insect)    insects++;
             else if (e instanceof Scavenger) scavs++;
             else if (e instanceof Bird)      birds++;
+            else if (e instanceof Fish)      fish++;
             else if (e instanceof Animal) {
                 if (e.type === 'herbivore') herbs++;
                 else carns++;
@@ -248,6 +251,7 @@ const UI = {
                 <div class="stat-row"><span class="key" style="color:#ffd040">INSECTS</span><span class="val">${insects}</span></div>
                 <div class="stat-row"><span class="key" style="color:#c878ff">SCAVENGERS</span><span class="val">${scavs}</span></div>
                 <div class="stat-row"><span class="key" style="color:#40d4aa">BIRDS</span><span class="val">${birds}</span></div>
+                <div class="stat-row"><span class="key" style="color:#38b8ff">FISH</span><span class="val">${fish}</span></div>
                 <div class="stat-row"><span class="key" style="color:#7a5030">CARCASSES</span><span class="val">${carcasses}</span></div>
             </div>`;
     },
