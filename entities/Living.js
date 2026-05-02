@@ -36,6 +36,53 @@ class Living {
     }
 
     /**
+     * Move by (speed) in this.direction, reflecting off world borders like a
+     * billiard ball. Adds a small random spread (±jitter radians) to prevent
+     * perfectly periodic bouncing. Returns true if moved freely, false if reflected.
+     *
+     * @param {World} world
+     * @param {number} speed        - pixels per tick
+     * @param {number} jitter       - max random angular spread on reflection (radians)
+     * @param {boolean} waterOk     - if true, water tiles are treated as passable
+     */
+    _reflectMove(world, speed, jitter = 0.35, waterOk = false) {
+        const MARGIN = 4;
+        let nx = this.x + Math.cos(this.direction) * speed;
+        let ny = this.y + Math.sin(this.direction) * speed;
+
+        const hitLeft   = nx < MARGIN;
+        const hitRight  = nx > world.width  - MARGIN;
+        const hitTop    = ny < MARGIN;
+        const hitBottom = ny > world.height - MARGIN;
+
+        if (hitLeft || hitRight) {
+            // Reflect horizontally: flip X component of direction
+            this.direction = Math.PI - this.direction + (Math.random() - 0.5) * jitter;
+            nx = hitLeft ? MARGIN : world.width - MARGIN;
+        }
+        if (hitTop || hitBottom) {
+            // Reflect vertically: flip Y component of direction
+            this.direction = -this.direction + (Math.random() - 0.5) * jitter;
+            ny = hitTop ? MARGIN : world.height - MARGIN;
+        }
+
+        const biome = world.getBiomeAt(nx, ny);
+        const canPass = waterOk
+            ? biome !== null
+            : biome && biome.passable;
+
+        if (canPass) {
+            this.x = nx;
+            this.y = ny;
+            return true;
+        } else {
+            // Terrain obstacle (water/mountain) — reflect with larger jitter
+            this.direction = this.direction + Math.PI + (Math.random() - 0.5) * 1.2;
+            return false;
+        }
+    }
+
+    /**
      * Returns a biome-based energy multiplier for this entity.
      * New genes: toxinResistance (volcanic/scorched), aquaticAdaptation (wetland).
      */

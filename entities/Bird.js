@@ -193,22 +193,8 @@ class Bird extends Living {
     }
 
     _move(world, ignoreWater) {
-        const spd = (this.genes.speed || 2.0);
-        let nx = this.x + Math.cos(this.direction) * spd;
-        let ny = this.y + Math.sin(this.direction) * spd;
-        nx = Math.max(5, Math.min(world.width  - 5, nx));
-        ny = Math.max(5, Math.min(world.height - 5, ny));
-
-        const biomeAt = world.getBiomeAt(nx, ny);
-        const canPass = ignoreWater
-            ? (biomeAt !== null)
-            : (biomeAt && biomeAt.passable);
-
-        if (canPass) {
-            this.x = nx; this.y = ny;
-        } else {
-            this.direction += Math.PI + (Math.random() - 0.5) * 0.8;
-        }
+        const spd = this.genes.speed || 0.75;
+        this._reflectMove(world, spd, 0.35, ignoreWater);
     }
 
     render(ctx, isSelected) {

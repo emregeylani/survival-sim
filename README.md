@@ -1,4 +1,4 @@
-# Survival Simulation
+# survival-sim
 
 A real-time evolution and ecosystem simulation. Six trophic layers — plants, insects, herbivores, carnivores, scavengers, and birds — evolve under pressure from seasons, natural disasters, and geographic isolation.
 
@@ -35,7 +35,8 @@ survival-sim/
 │   ├── Carcass.js           # Temporary object — fresh window (~140–200 ticks), decay
 │   ├── Animal.js            # Herbivore / Carnivore — full state machine, drops carcass on death
 │   ├── Scavenger.js         # Eats only fresh carcasses, flees carnivores
-│   └── Bird.js              # Insect hunter; strength > 1.5 unlocks herbivore dive attack
+│   ├── Bird.js              # Insect + Fish hunter; strength > 1.5 unlocks herbivore dive attack
+│   └── Fish.js              # Water-only; passive nutrient absorption; prey for Birds
 │
 ├── events/
 │   └── disasters.js         # Meteor, volcano, ice age, drought
@@ -54,12 +55,17 @@ survival-sim/
 Sun
   └─► Plant
         ├─► Insect  ──────────────────► Bird
+        │                                 ├──► Fish         (dive attack)
         │                                 └──► [Herbivore]  (once strength > 1.5 evolves)
         └─► Herbivore ──► Carnivore
                                │
                                ▼
-                           Carcass  ◄── (spawned on every animal death)
+                           Carcass  ◄── (spawned on every animal/fish death)
                                └─► Scavenger  (within fresh window only)
+
+Water
+  └─► Fish  (passive nutrient absorption, aquaticAdaptation scales gain rate)
+        └─► Bird  (dive attack; camouflage gene reduces catch chance)
 ```
 
 ---
@@ -81,7 +87,7 @@ Every entity carries **12 genes**. Evolution happens through **crossover** (domi
 | `heatResistance` | Effectiveness in desert / drought biomes |
 | `toxinResistance` | Survival in volcanic / scorched areas |
 | `nocturnalAdaptation` | Reduces energy drain during Autumn / Winter |
-| `aquaticAdaptation` | Energy bonus in wetland biome |
+| `aquaticAdaptation` | Energy bonus in wetland biome; directly scales Fish nutrient absorption rate |
 
 ### Speciation
 `maxMatingRange` caps the distance at which two entities can mate. Geographically isolated populations drift toward different gene frequencies. Individuals of the same species are visually tinted by `lineageId` to make divergence visible.
@@ -99,7 +105,7 @@ Every entity carries **12 genes**. Evolution happens through **crossover** (domi
 | Desert | Low | `heatResistance` required |
 | Snow | Low | `coldResistance` required |
 | Volcanic | Minimal | `toxinResistance` required |
-| Water | — | Impassable (Birds can cross) |
+| Water | — | Impassable for land entities (Birds can cross); exclusive habitat for Fish |
 
 ---
 
@@ -138,6 +144,7 @@ Cycle every **500 ticks**:
 | Max Plants | 500 | Population cap |
 | Max Scavengers | 80 | Population cap |
 | Max Birds | 100 | Population cap |
+| Max Fish | 120 | Population cap |
 | Mating Range | 180 px | Mating distance limit — lower = faster speciation |
 | World Seed | Random | Same seed = same map |
 
@@ -166,7 +173,28 @@ Cycle every **500 ticks**:
 - As Bird population grows, Insect count drops → pressure on Herbivores from Carnivores increases
 
 **To observe Bird dive attack evolution:**
-Unlocks automatically once `genes.strength > 1.5`. The `Dive Hunter` trait tag appears in the ENTITY panel and the beak gains an orange highlight.
+Unlocks automatically once `genes.strength > 1.5`. The `Dive Hunter` trait tag appears in the ENTITY panel and the beak gains an orange highlight. Birds will now also target Fish — watch shoreline Bird density increase near large water bodies.
+
+**To observe Fish camouflage selection:**
+As Bird population grows, Fish with low `camouflage` get picked off first. Over generations the average `camouflage` in the Fish population should drift upward. Zoom into a water body and inspect individual Fish genes to track this.
+
+---
+
+## Fish Behaviour
+
+Fish are the only entity confined to water tiles. They do not eat — instead they passively absorb energy scaled by `aquaticAdaptation × season multiplier`. In winter their gain rate drops significantly, creating boom-bust cycles.
+
+| Predator | Catch mechanic |
+|----------|----------------|
+| Bird | Dive attack; `Fish.camouflage` reduces catch probability by up to 55% |
+
+On death, Fish drop a `Carcass` at the shoreline (where they last were) — Scavengers near water edges benefit from Bird fishing activity.
+
+**Key genes for Fish:**
+- `aquaticAdaptation` — primary energy source scaler; highest impact gene for Fish survival
+- `camouflage` — reduces Bird catch chance: `catchChance = max(0.15, 0.75 − camouflage × 0.55)`
+- `speed` — escape from dive attacks
+- `size` — larger Fish carry more energy but are slower and easier targets
 
 ---
 
@@ -175,5 +203,6 @@ Unlocks automatically once `genes.strength > 1.5`. The `Dive Hunter` trait tag a
 - **SpatialGrid** — 80 px cell size, reduces proximity queries from O(n²) to ~O(1)
 - **Carcass fresh window** — ~140–200 ticks; Scavengers cannot feed after this, carcass fades visually
 - **Double-spawn guard** — `_carcassSpawned` flag prevents two Carcass objects from one death event
-- **Render order** — Carcass → Plant → moving entities (z-order)
+- **Fish placement** — spawned exclusively in water tiles at startup; bounce off shore edges during movement
+- **Render order** — Carcass → Plant → moving entities (Fish render underwater, below Birds visually)
 - All entities render via `ctx.save / translate / rotate / restore`, independent of camera transform

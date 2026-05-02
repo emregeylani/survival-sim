@@ -47,8 +47,7 @@ class Scavenger extends Living {
         const biome = world.getBiomeAt(this.x, this.y);
         if (!biome || biome.type === 'water') {
             this.energy -= dt * 0.08;
-            this._turnAround();
-            this._move(world, 0.5);
+            this._reflectMove(world, this.genes.speed || 0.42);
             return;
         }
 
@@ -174,16 +173,8 @@ class Scavenger extends Living {
     }
 
     _move(world, speedMult) {
-        const spd = (this.genes.speed || 1.1) * speedMult;
-        let nx = this.x + Math.cos(this.direction) * spd;
-        let ny = this.y + Math.sin(this.direction) * spd;
-        nx = Math.max(5, Math.min(world.width  - 5, nx));
-        ny = Math.max(5, Math.min(world.height - 5, ny));
-        if (world.isPassable(nx, ny)) {
-            this.x = nx; this.y = ny;
-        } else {
-            this._turnAround();
-        }
+        const spd = (this.genes.speed || 0.42) * speedMult;
+        this._reflectMove(world, spd);
     }
 
     render(ctx, isSelected) {

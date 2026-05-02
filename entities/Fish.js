@@ -117,18 +117,32 @@ class Fish extends Living {
     }
 
     _move(world) {
-        const spd = this.genes.speed || 0.55;
+        // Fish reflect off world borders and off shore (non-water tiles)
+        const spd   = this.genes.speed || 0.55;
+        const MARGIN = 4;
         let nx = this.x + Math.cos(this.direction) * spd;
         let ny = this.y + Math.sin(this.direction) * spd;
-        nx = Math.max(4, Math.min(world.width  - 4, nx));
-        ny = Math.max(4, Math.min(world.height - 4, ny));
+
+        const hitLeft   = nx < MARGIN;
+        const hitRight  = nx > world.width  - MARGIN;
+        const hitTop    = ny < MARGIN;
+        const hitBottom = ny > world.height - MARGIN;
+
+        if (hitLeft || hitRight) {
+            this.direction = Math.PI - this.direction + (Math.random() - 0.5) * 0.35;
+            nx = hitLeft ? MARGIN : world.width - MARGIN;
+        }
+        if (hitTop || hitBottom) {
+            this.direction = -this.direction + (Math.random() - 0.5) * 0.35;
+            ny = hitTop ? MARGIN : world.height - MARGIN;
+        }
 
         const b = world.getBiomeAt(nx, ny);
         if (b && b.type === 'water') {
             this.x = nx; this.y = ny;
         } else {
-            // Bounce off shore
-            this.direction += Math.PI + (Math.random() - 0.5) * 0.8;
+            // Shore — reflect back into water with jitter
+            this.direction = this.direction + Math.PI + (Math.random() - 0.5) * 1.0;
         }
     }
 

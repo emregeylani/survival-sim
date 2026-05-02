@@ -92,13 +92,7 @@ class Insect extends Living {
     _bounce() { this.direction += Math.PI + (Math.random() - 0.5) * 0.8; }
 
     _move(world) {
-        const spd = this.genes.speed;
-        let nx = this.x + Math.cos(this.direction) * spd;
-        let ny = this.y + Math.sin(this.direction) * spd;
-        nx = Math.max(4, Math.min(world.width  - 4, nx));
-        ny = Math.max(4, Math.min(world.height - 4, ny));
-        if (world.isPassable(nx, ny)) { this.x = nx; this.y = ny; }
-        else this._bounce();
+        this._reflectMove(world, this.genes.speed);
     }
 
     render(ctx, isSelected) {

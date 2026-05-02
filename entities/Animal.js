@@ -56,8 +56,7 @@ class Animal extends Living {
 
         if (!biome || biome.type === 'water') {
             this.energy -= dt * 0.08;
-            this._turnAround();
-            this._move(world, 0.5);
+            this._reflectMove(world, (this.genes.speed || 0.36) * 0.5);
             return;
         }
 
@@ -239,19 +238,9 @@ class Animal extends Living {
 
     // ─── Move ────────────────────────────────────────────────────────────
     _move(world, speedMult) {
-        const spd = (this.genes.speed || 1) * speedMult
+        const spd = (this.genes.speed || 0.36) * speedMult
                   * (this.state === ANIMAL_STATES.FLEE ? 1.6 : 1.0);
-        let nx = this.x + Math.cos(this.direction) * spd;
-        let ny = this.y + Math.sin(this.direction) * spd;
-
-        nx = Math.max(5, Math.min(world.width  - 5, nx));
-        ny = Math.max(5, Math.min(world.height - 5, ny));
-
-        if (world.isPassable(nx, ny)) {
-            this.x = nx; this.y = ny;
-        } else {
-            this._turnAround();
-        }
+        this._reflectMove(world, spd);
     }
 
     _turnAround() {
