@@ -171,5 +171,11 @@ const Analytics = {
         document.getElementById('ext-content').innerHTML = '<span class="dim">no extinctions yet</span>';
         document.getElementById('stat-extinct').textContent = '0';
         document.getElementById('hof-content').innerHTML   = '';
+        // Reset all population stat counters
+        ['stat-plants','stat-herbivores','stat-carnivores','stat-insects',
+         'stat-scavengers','stat-birds','stat-fish','stat-maxgen'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = '0';
+        });
     },
 };

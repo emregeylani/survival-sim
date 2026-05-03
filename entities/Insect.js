@@ -30,7 +30,7 @@ class Insect extends Living {
         const biome = world.getBiomeAt(this.x, this.y);
         if (!biome || biome.type === 'water') {
             this.energy -= dt * 0.06;
-            this._bounce();
+            this._reflectMove(world, this.genes.speed || 0.375);
             return;
         }
 

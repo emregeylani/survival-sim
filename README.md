@@ -157,7 +157,19 @@ Cycle every **500 ticks**:
 | Zoom in / out | Mouse wheel |
 | Pan | Left-click drag |
 | Reset view | Double-click |
+| Pause / resume | **Spacebar** (works anywhere except text inputs) |
 | Zoom level | Indicator in bottom-right corner |
+
+## Border Reflection
+
+All entities reflect off world edges like a billiard ball rather than getting stuck. When an entity hits a border:
+
+- **Left / right wall** — horizontal velocity component is flipped (`direction = π − direction`)
+- **Top / bottom wall** — vertical component is flipped (`direction = −direction`)
+- A small random jitter (±0.35 rad) is added to each reflection to prevent perfectly periodic bouncing
+- Terrain obstacles (water for land animals, shore for fish) trigger a wider jitter (±0.6 rad) full reverse
+
+Fish use their own variant that keeps them strictly within water tiles, reflecting off the shore boundary.
 
 ---
 
@@ -203,6 +215,7 @@ On death, Fish drop a `Carcass` at the shoreline (where they last were) — Scav
 - **SpatialGrid** — 80 px cell size, reduces proximity queries from O(n²) to ~O(1)
 - **Carcass fresh window** — ~140–200 ticks; Scavengers cannot feed after this, carcass fades visually
 - **Double-spawn guard** — `_carcassSpawned` flag prevents two Carcass objects from one death event
-- **Fish placement** — spawned exclusively in water tiles at startup; bounce off shore edges during movement
+- **Fish placement** — spawned exclusively in water tiles at startup; bounce off shore edges during movement; emergency reseed triggers at <5 Fish (water-only search, up to 400 tries)
+- **Border reflection** — `Living._reflectMove()` shared by all entities; mirrors direction on axis of contact + random jitter to prevent periodic loops
 - **Render order** — Carcass → Plant → moving entities (Fish render underwater, below Birds visually)
 - All entities render via `ctx.save / translate / rotate / restore`, independent of camera transform

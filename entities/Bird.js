@@ -58,7 +58,7 @@ class Bird extends Living {
                 this.direction  += (Math.random() - 0.5) * 0.6;
                 this.turnCooldown = 8;
             }
-            this._move(world, true); // ignoreWater = true
+            this._reflectMove(world, this.genes.speed || 0.75, 0.35, true);
             return;
         }
 

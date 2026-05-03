@@ -112,6 +112,7 @@ const Params = {
         bind('p-maxplant',   'maxPlants',      parseInt);
         bind('p-maxscav',    'maxScavengers',  parseInt);
         bind('p-maxbird',    'maxBirds',       parseInt);
+        bind('p-maxfish',    'maxFish',        parseInt);
         bind('p-matingrange','maxMatingRange', parseInt);
 
         document.getElementById('btn-restart').addEventListener('click', () => {

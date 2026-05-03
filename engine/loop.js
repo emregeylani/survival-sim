@@ -166,6 +166,22 @@ class SimulationLoop {
                 placed++;
             }
         }
+
+        // Emergency Fish reseed — confined to water so can't recolonise naturally
+        const fishCount = this.entities.filter(e => e instanceof Fish && e.alive).length;
+        if (fishCount < 5) {
+            let placed = 0, tries = 0;
+            while (placed < 8 && tries < 400) {
+                tries++;
+                const x = 12 + Math.random() * (this.world.width  - 24);
+                const y = 12 + Math.random() * (this.world.height - 24);
+                const b = this.world.getBiomeAt(x, y);
+                if (b && b.type === 'water') {
+                    this.entities.push(new Fish(x, y));
+                    placed++;
+                }
+            }
+        }
     }
 
     // ── Analytics ────────────────────────────────────────────────────────
